@@ -2,6 +2,11 @@
 session_start();
 include(__DIR__ . "/conexion.php"); // Conexión a MySQL
 
+if (!isset($_SESSION['idUsuario'])) {
+    header("Location: login.php");
+    exit();
+}
+
 // Verificar la conexión
 if ($conn->connect_error) {
     die("❌ No se pudo conectar a MySQL: " . $conn->connect_error);
@@ -539,4 +544,5 @@ $conn->close();
 
 <?php include(__DIR__ . "/includes/footer.php"); ?>
 </body>
+
 </html>
