@@ -88,9 +88,9 @@ if (isset($_SESSION['mensaje'])) {
 // LISTADO DE PRODUCTOS
 // -------------------------
 $sqlProductos = "SELECT p.idProducto, p.nombreProducto, p.precio, c.nombreCategoria, p.estado
-                 FROM producto p
-                 JOIN categoria c ON p.idCategoria = c.idCategoria
-                 ORDER BY p.idProducto ASC";
+                  FROM producto p
+                  JOIN categoria c ON p.idCategoria = c.idCategoria
+                  ORDER BY p.idProducto ASC";
 $resultProductos = $conn->query($sqlProductos);
 
 // -------------------------
@@ -110,20 +110,56 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Productos - Aroma S.A.C</title>
     <style>
-        /* ... El CSS permanece igual ... */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary-color: #5f27cd;
+            --secondary-color: #a55eea;
+            --accent-color: #0984e3;
+            --text-color: #2d3436;
+            --background-color: #f5f6fa;
+            --card-background: rgba(255, 255, 255, 0.95);
+            --border-color: #e9ecef;
+            --success-color: #00b894;
+            --warning-color: #fdcb6e;
+            --info-color: #0984e3;
+            --error-color: #d63031;
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f6fa;
+            background: var(--background-color);
             min-height: 100vh;
+            margin: 0;
+            color: var(--text-color);
         }
 
-        /* Toast flotante centrado superior */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .page-title {
+            color: var(--text-color);
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .page-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 2px;
+        }
+
+        /* --- Toast --- */
         #toast {
             position: fixed;
             top: 20px;
@@ -150,55 +186,28 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         }
         
         #toast.success { 
-            background: linear-gradient(135deg, #00b894, #00a085);
+            background: linear-gradient(135deg, var(--success-color), #00a085);
             border-left: 4px solid #00e676;
         }
         
         #toast.info { 
-            background: linear-gradient(135deg, #0984e3, #74b9ff);
+            background: linear-gradient(135deg, var(--info-color), #74b9ff);
             border-left: 4px solid #00bcd4;
         }
         
         #toast.warning { 
-            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            background: linear-gradient(135deg, var(--warning-color), #e17055);
             border-left: 4px solid #ff9800;
         }
         
         #toast.error { 
-            background: linear-gradient(135deg, #d63031, #e84393);
+            background: linear-gradient(135deg, var(--error-color), #e84393);
             border-left: 4px solid #f44336;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 30px;
-        }
-
-        .page-title {
-            color: #2d3436;
-            font-size: 2.2rem;
-            font-weight: 600;
-            margin-bottom: 30px;
-            text-align: center;
-            position: relative;
-        }
-
-        .page-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 3px;
-            background: linear-gradient(90deg, #5f27cd, #a55eea);
-            border-radius: 2px;
-        }
-
-        /* Formulario */
+        /* --- Formulario --- */
         .form-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-background);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 35px;
@@ -216,11 +225,11 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #5f27cd, #a55eea, #5f27cd);
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--primary-color));
         }
 
         .form-title {
-            color: #5f27cd;
+            color: var(--primary-color);
             font-size: 1.4rem;
             font-weight: 600;
             margin-bottom: 25px;
@@ -231,7 +240,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
 
         .form-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin-bottom: 25px;
         }
@@ -243,7 +252,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         .form-input, .form-select {
             width: 100%;
             padding: 15px 20px;
-            border: 2px solid #e9ecef;
+            border: 2px solid var(--border-color);
             border-radius: 12px;
             font-size: 16px;
             transition: all 0.3s ease;
@@ -253,7 +262,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
 
         .form-input:focus, .form-select:focus {
             outline: none;
-            border-color: #a55eea;
+            border-color: var(--secondary-color);
             box-shadow: 0 0 0 3px rgba(165, 94, 234, 0.1);
             background: rgba(255, 255, 255, 1);
         }
@@ -264,7 +273,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         }
 
         .submit-btn {
-            background: linear-gradient(135deg, #5f27cd, #a55eea);
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
             padding: 15px 35px;
             border: none;
@@ -276,6 +285,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             text-transform: uppercase;
             letter-spacing: 1px;
             box-shadow: 0 6px 20px rgba(95, 39, 205, 0.3);
+            width: fit-content;
         }
 
         .submit-btn:hover {
@@ -283,9 +293,9 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             box-shadow: 0 8px 25px rgba(95, 39, 205, 0.4);
         }
 
-        /* Tabla */
+        /* --- Tabla --- */
         .table-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-background);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 35px;
@@ -302,11 +312,11 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #0984e3, #74b9ff, #0984e3);
+            background: linear-gradient(90deg, var(--info-color), #74b9ff, var(--info-color));
         }
 
         .table-title {
-            color: #0984e3;
+            color: var(--info-color);
             font-size: 1.4rem;
             font-weight: 600;
             margin-bottom: 25px;
@@ -317,8 +327,8 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
 
         .products-table {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
+            border-collapse: collapse;
+            table-layout: fixed;
             background: white;
             border-radius: 12px;
             overflow: hidden;
@@ -328,13 +338,12 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         .products-table th {
             background: linear-gradient(135deg, #2d3436, #636e72);
             color: white;
-            padding: 18px 15px;
+            padding: 12px 10px;
             text-align: center;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            border: none;
         }
 
         .products-table th:first-child {
@@ -346,12 +355,16 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         }
 
         .products-table td {
-            padding: 16px 15px;
+            padding: 10px 8px;
             text-align: center;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--border-color);
             vertical-align: middle;
-            color: #2d3436;
+            color: var(--text-color);
             font-weight: 500;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .products-table tr:hover {
@@ -362,54 +375,68 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             border-bottom: none;
         }
 
-        /* Estados */
-        .status-badge {
-            padding: 6px 14px;
-            border-radius: 20px;
+        .price {
+            font-weight: 700;
+            color: var(--success-color);
             font-size: 13px;
+        }
+
+        /* --- Estados --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: inline-block;
         }
 
         .status-active {
             background: rgba(0, 184, 148, 0.1);
-            color: #00b894;
+            color: var(--success-color);
             border: 1px solid rgba(0, 184, 148, 0.2);
         }
 
         .status-inactive {
             background: rgba(214, 48, 49, 0.1);
-            color: #d63031;
+            color: var(--error-color);
             border: 1px solid rgba(214, 48, 49, 0.2);
         }
 
-        /* Botones de acción */
+        /* --- Botones de acción --- */
+        .action-btn-container {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            flex-wrap: wrap; /* Permite que los botones se envuelvan */
+        }
+        
         .action-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
             text-decoration: none;
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             display: inline-block;
-            margin: 2px;
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            white-space: nowrap;
         }
 
         .btn-edit {
-            background: linear-gradient(135deg, #0984e3, #74b9ff);
+            background: linear-gradient(135deg, var(--info-color), #74b9ff);
             color: white;
         }
 
         .btn-toggle {
-            background: linear-gradient(135deg, #d63031, #e84393);
+            background: linear-gradient(135deg, var(--error-color), #e84393);
             color: white;
         }
 
         .btn-activate {
-            background: linear-gradient(135deg, #00b894, #00e676);
+            background: linear-gradient(135deg, var(--success-color), #00e676);
             color: white;
         }
 
@@ -418,26 +445,16 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .price {
-            font-weight: 700;
-            color: #00b894;
-            font-size: 15px;
-        }
-
-        /* Responsive */
+        /* --- Responsive --- */
         @media (max-width: 1024px) {
             .form-grid {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             }
         }
 
         @media (max-width: 768px) {
             .container {
                 padding: 20px 15px;
-            }
-            
-            .form-grid {
-                grid-template-columns: 1fr;
             }
             
             .form-container, .table-container {
@@ -447,23 +464,58 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             .page-title {
                 font-size: 1.8rem;
             }
-            
-            .products-table {
-                font-size: 14px;
-            }
-            
-            .products-table th,
-            .products-table td {
-                padding: 12px 8px;
-            }
-        }
 
-        @media (max-width: 480px) {
-            .action-btn {
-                padding: 6px 12px;
-                font-size: 12px;
+            .products-table {
+                box-shadow: none;
+                border-radius: 0;
+            }
+            
+            thead {
+                display: none;
+            }
+            
+            tr {
                 display: block;
-                margin: 3px 0;
+                margin-bottom: 15px;
+                background: white;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                padding: 10px;
+            }
+            
+            td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                text-align: right;
+                padding: 8px 10px;
+                border-bottom: 1px solid var(--border-color);
+                white-space: normal;
+            }
+
+            td:last-child {
+                border-bottom: none;
+            }
+            
+            td::before {
+                content: attr(data-label);
+                font-weight: bold;
+                color: var(--primary-color);
+                text-align: left;
+                flex-grow: 1;
+                flex-basis: 50%;
+            }
+            
+            .action-btn-container {
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+            }
+
+            .action-btn {
+                width: 100%;
+                text-align: center;
             }
         }
     </style>
@@ -525,22 +577,24 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
                     <?php 
                     if ($resultProductos->num_rows > 0) {
                         while($row = $resultProductos->fetch_assoc()): ?>
-                        <tr>
-                            <td><strong><?php echo $row['idProducto']; ?></strong></td>
-                            <td><?php echo htmlspecialchars($row['nombreProducto']); ?></td>
-                            <td><span class="price">S/. <?php echo number_format($row['precio'], 2); ?></span></td>
-                            <td><?php echo htmlspecialchars($row['nombreCategoria']); ?></td>
-                            <td>
+                        <tr data-id="<?php echo $row['idProducto']; ?>">
+                            <td data-label="ID"><strong><?php echo $row['idProducto']; ?></strong></td>
+                            <td data-label="Nombre"><?php echo htmlspecialchars($row['nombreProducto']); ?></td>
+                            <td data-label="Precio"><span class="price">S/. <?php echo number_format($row['precio'], 2); ?></span></td>
+                            <td data-label="Categoría"><?php echo htmlspecialchars($row['nombreCategoria']); ?></td>
+                            <td data-label="Estado">
                                 <span class="status-badge <?php echo $row['estado'] ? 'status-active' : 'status-inactive'; ?>">
                                     <?php echo $row['estado'] ? 'ACTIVO' : 'INACTIVO'; ?>
                                 </span>
                             </td>
-                            <td>
-                                <a href="editar_producto.php?id=<?php echo $row['idProducto']; ?>" class="action-btn btn-edit">Editar</a>
-                                <a href="productos.php?toggle=<?php echo $row['idProducto']; ?>" 
-                                   class="action-btn <?php echo $row['estado'] ? 'btn-toggle' : 'btn-activate'; ?>">
-                                    <?php echo $row['estado'] ? 'Desactivar' : 'Activar'; ?>
-                                </a>
+                            <td data-label="Acciones">
+                                <div class="action-btn-container">
+                                    <a href="editar_producto.php?id=<?php echo $row['idProducto']; ?>" class="action-btn btn-edit">Editar</a>
+                                    <a href="productos.php?toggle=<?php echo $row['idProducto']; ?>" 
+                                       class="action-btn <?php echo $row['estado'] ? 'btn-toggle' : 'btn-activate'; ?>">
+                                        <?php echo $row['estado'] ? 'Desactivar' : 'Activar'; ?>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         <?php endwhile;
