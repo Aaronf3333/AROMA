@@ -1,54 +1,59 @@
 <?php
 session_start();
-// Asegúrate de que este archivo 'conexion.php' sea para MySQL.
-include(__DIR__ . "/conexion.php"); 
+include(__DIR__ . "/conexion.php"); // Conexión a MySQL
 
 if ($conn->connect_error) {
     die("❌ No se pudo conectar a MySQL: " . $conn->connect_error);
 }
 
 $mensaje = "";
-$tipoMensaje = ""; // success, info, warning, error
+$tipoMensaje = "";
 
 // -------------------------
-// AGREGAR PRODUCTO
+// PROCESAMIENTO DE ACCIONES (POST y GET)
 // -------------------------
+
+// AGREGAR PRODUCTO
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombreProducto'])) {
     $nombreProducto = trim($_POST['nombreProducto']);
     $precio = floatval($_POST['precio']);
     $idCategoria = intval($_POST['idCategoria']);
 
-    // Verificar si el producto ya existe
-    $checkSql = "SELECT idProducto FROM producto WHERE nombreProducto=? AND idCategoria=?";
-    $stmtCheck = $conn->prepare($checkSql);
-    $stmtCheck->bind_param("si", $nombreProducto, $idCategoria);
-    $stmtCheck->execute();
-    $resultCheck = $stmtCheck->get_result();
-
-    if ($resultCheck->num_rows > 0) {
-        $_SESSION['mensaje'] = "Este producto ya existe en la categoría seleccionada.";
-        $_SESSION['tipo'] = "warning";
+    // Validar que los campos no estén vacíos y que el precio sea válido
+    if (empty($nombreProducto) || $precio <= 0 || $idCategoria <= 0) {
+        $_SESSION['mensaje'] = "Por favor, completa todos los campos correctamente.";
+        $_SESSION['tipo'] = "error";
     } else {
-        $sql = "INSERT INTO producto (nombreProducto, precio, idCategoria) VALUES (?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sdi", $nombreProducto, $precio, $idCategoria);
+        // Verificar si el producto ya existe usando una sentencia preparada
+        $checkSql = "SELECT idProducto FROM producto WHERE nombreProducto=? AND idCategoria=?";
+        $stmtCheck = $conn->prepare($checkSql);
+        $stmtCheck->bind_param("si", $nombreProducto, $idCategoria);
+        $stmtCheck->execute();
+        $resultCheck = $stmtCheck->get_result();
 
-        if ($stmt->execute()) {
-            $_SESSION['mensaje'] = "Producto agregado correctamente.";
-            $_SESSION['tipo'] = "success";
+        if ($resultCheck->num_rows > 0) {
+            $_SESSION['mensaje'] = "Este producto ya existe en la categoría seleccionada.";
+            $_SESSION['tipo'] = "warning";
         } else {
-            $_SESSION['mensaje'] = "Error al agregar el producto: " . $stmt->error;
-            $_SESSION['tipo'] = "error";
-        }
-    }
+            // Insertar el nuevo producto
+            $sql = "INSERT INTO producto (nombreProducto, precio, idCategoria) VALUES (?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sdi", $nombreProducto, $precio, $idCategoria);
 
-    header("Location: productos.php");
-    exit();
+            if ($stmt->execute()) {
+                $_SESSION['mensaje'] = "Producto agregado correctamente.";
+                $_SESSION['tipo'] = "success";
+            } else {
+                $_SESSION['mensaje'] = "Error al agregar el producto: " . $stmt->error;
+                $_SESSION['tipo'] = "error";
+            }
+            $stmt->close();
+        }
+        $stmtCheck->close();
+    }
 }
 
-// -------------------------
 // ACTIVAR/DESACTIVAR PRODUCTO
-// -------------------------
 if (isset($_GET['toggle'])) {
     $idProducto = intval($_GET['toggle']);
     
@@ -69,8 +74,13 @@ if (isset($_GET['toggle'])) {
 
         $_SESSION['mensaje'] = $nuevoEstado ? "Producto activado." : "Producto desactivado.";
         $_SESSION['tipo'] = $nuevoEstado ? "success" : "info";
+        $stmtToggle->close();
     }
+    $stmtEstado->close();
+}
 
+// Redirección unificada al final del procesamiento de acciones
+if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['toggle'])) {
     header("Location: productos.php");
     exit();
 }
@@ -85,7 +95,7 @@ if (isset($_SESSION['mensaje'])) {
 }
 
 // -------------------------
-// LISTADO DE PRODUCTOS
+// LISTADO DE PRODUCTOS (se mantiene igual, pero la sugerencia es usar prepared statements para la consistencia)
 // -------------------------
 $sqlProductos = "SELECT p.idProducto, p.nombreProducto, p.precio, c.nombreCategoria, p.estado
                   FROM producto p
@@ -94,7 +104,7 @@ $sqlProductos = "SELECT p.idProducto, p.nombreProducto, p.precio, c.nombreCatego
 $resultProductos = $conn->query($sqlProductos);
 
 // -------------------------
-// LISTADO DE CATEGORÍAS (para el formulario)
+// LISTADO DE CATEGORÍAS
 // -------------------------
 $sqlCategorias = "SELECT idCategoria, nombreCategoria FROM categoria ORDER BY nombreCategoria ASC";
 $resultCategorias = $conn->query($sqlCategorias);
@@ -109,6 +119,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Productos - Aroma S.A.C</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #5f27cd;
@@ -125,7 +136,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Poppins', sans-serif; /* Coherencia de fuente */
             background: var(--background-color);
             min-height: 100vh;
             margin: 0;
@@ -325,6 +336,12 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             gap: 10px;
         }
 
+        .responsive-table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .products-table {
             width: 100%;
             border-collapse: collapse;
@@ -333,6 +350,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            min-width: 600px; /* Asegura un ancho mínimo para evitar desbordes */
         }
 
         .products-table th {
@@ -409,7 +427,7 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
             display: flex;
             justify-content: center;
             gap: 5px;
-            flex-wrap: wrap; /* Permite que los botones se envuelvan */
+            flex-wrap: wrap;
         }
         
         .action-btn {
@@ -562,48 +580,50 @@ while ($rowCat = $resultCategorias->fetch_assoc()) {
 
         <div class="table-container">
             <h3 class="table-title">📋 Lista de Productos</h3>
-            <table class="products-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Precio</th>
-                        <th>Categoría</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    if ($resultProductos->num_rows > 0) {
-                        while($row = $resultProductos->fetch_assoc()): ?>
-                        <tr data-id="<?php echo $row['idProducto']; ?>">
-                            <td data-label="ID"><strong><?php echo $row['idProducto']; ?></strong></td>
-                            <td data-label="Nombre"><?php echo htmlspecialchars($row['nombreProducto']); ?></td>
-                            <td data-label="Precio"><span class="price">S/. <?php echo number_format($row['precio'], 2); ?></span></td>
-                            <td data-label="Categoría"><?php echo htmlspecialchars($row['nombreCategoria']); ?></td>
-                            <td data-label="Estado">
-                                <span class="status-badge <?php echo $row['estado'] ? 'status-active' : 'status-inactive'; ?>">
-                                    <?php echo $row['estado'] ? 'ACTIVO' : 'INACTIVO'; ?>
-                                </span>
-                            </td>
-                            <td data-label="Acciones">
-                                <div class="action-btn-container">
-                                    <a href="editar_producto.php?id=<?php echo $row['idProducto']; ?>" class="action-btn btn-edit">Editar</a>
-                                    <a href="productos.php?toggle=<?php echo $row['idProducto']; ?>" 
-                                       class="action-btn <?php echo $row['estado'] ? 'btn-toggle' : 'btn-activate'; ?>">
-                                        <?php echo $row['estado'] ? 'Desactivar' : 'Activar'; ?>
-                                    </a>
-                                </div>
-                            </td>
+            <div class="responsive-table-wrapper">
+                <table class="products-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Precio</th>
+                            <th>Categoría</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
                         </tr>
-                        <?php endwhile;
-                    } else {
-                        echo "<tr><td colspan='6'>No hay productos registrados.</td></tr>";
-                    }
-                    ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        if ($resultProductos->num_rows > 0) {
+                            while($row = $resultProductos->fetch_assoc()): ?>
+                            <tr data-id="<?php echo $row['idProducto']; ?>">
+                                <td data-label="ID"><strong><?php echo $row['idProducto']; ?></strong></td>
+                                <td data-label="Nombre"><?php echo htmlspecialchars($row['nombreProducto']); ?></td>
+                                <td data-label="Precio"><span class="price">S/. <?php echo number_format($row['precio'], 2); ?></span></td>
+                                <td data-label="Categoría"><?php echo htmlspecialchars($row['nombreCategoria']); ?></td>
+                                <td data-label="Estado">
+                                    <span class="status-badge <?php echo $row['estado'] ? 'status-active' : 'status-inactive'; ?>">
+                                        <?php echo $row['estado'] ? 'ACTIVO' : 'INACTIVO'; ?>
+                                    </span>
+                                </td>
+                                <td data-label="Acciones">
+                                    <div class="action-btn-container">
+                                        <a href="editar_producto.php?id=<?php echo $row['idProducto']; ?>" class="action-btn btn-edit">Editar</a>
+                                        <a href="productos.php?toggle=<?php echo $row['idProducto']; ?>" 
+                                           class="action-btn <?php echo $row['estado'] ? 'btn-toggle' : 'btn-activate'; ?>">
+                                            <?php echo $row['estado'] ? 'Desactivar' : 'Activar'; ?>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endwhile;
+                        } else {
+                            echo "<tr><td colspan='6'>No hay productos registrados.</td></tr>";
+                        }
+                        ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
