@@ -6,11 +6,6 @@ if ($conn->connect_error) {
     die("❌ No se pudo conectar a MySQL: " . $conn->connect_error);
 }
 
-if (!isset($_SESSION['idUsuario'])) {
-    header("Location: login.php");
-    exit();
-}
-
 // Obtener ID del cliente
 if (!isset($_GET['id'])) {
     header("Location: clientes.php");
@@ -153,3 +148,4 @@ form button { background:#3b3b98; color:white; padding:10px 20px; border:none; b
 </body>
 
 </html>
+
