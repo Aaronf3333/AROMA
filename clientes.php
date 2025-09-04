@@ -7,6 +7,11 @@ if ($conn->connect_error) {
     die("❌ No se pudo conectar a MySQL: " . $conn->connect_error);
 }
 
+if (!isset($_SESSION['idUsuario'])) {
+    header("Location: login.php");
+    exit();
+}
+
 // Variables para los mensajes de notificación
 $mensaje = "";
 $tipoMensaje = ""; // success, info, warning, error
@@ -60,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         } else {
             // Si la persona no existe, insertarla primero en la tabla `Persona`
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
-                           VALUES (?, ?, ?, ?, ?, ?)";
+                            VALUES (?, ?, ?, ?, ?, ?)";
             $stmtPersona = $conn->prepare($sqlPersona);
             $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
             $stmtPersona->execute();
@@ -152,63 +157,419 @@ $conn->close();
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clientes - Aroma S.A.C</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; margin: 0; }
-        .search-section { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .search-container { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
-        .search-box { position: relative; flex: 1; min-width: 250px; }
-        .search-input { width: 100%; padding: 12px 45px 12px 15px; border: 2px solid #e1e8ed; border-radius: 25px; font-size: 16px; transition: all 0.3s ease; background: #f8f9fa; box-sizing: border-box; }
-        .search-input:focus { outline: none; border-color: #3b3b98; background: white; box-shadow: 0 0 0 3px rgba(59, 59, 152, 0.1); }
-        .search-icon { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 18px; }
-        .clear-search { position: absolute; right: 45px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6c757d; font-size: 18px; cursor: pointer; padding: 5px; border-radius: 50%; display: none; }
-        .clear-search:hover { background: #e9ecef; color: #495057; }
-        .search-filters { display: flex; gap: 10px; flex-wrap: wrap; }
-        .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; background: white; font-size: 14px; }
-        .search-stats { margin-top: 15px; padding: 10px; background: #e8f4fd; border-radius: 5px; color: #2c5aa0; font-size: 14px; display: none; }
-        .add-client-form { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-input { padding: 12px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: #f8f9fa; }
-        .form-input:focus { outline: none; border-color: #3b3b98; background: white; box-shadow: 0 0 0 3px rgba(59, 59, 152, 0.1); }
-        .form-button { background: #3b3b98; color: white; padding: 12px 25px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; align-self: flex-start; }
-        .form-button:hover { background: #575fcf; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 59, 152, 0.3); }
-        .clients-table-container { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 8px; text-align: center; border-bottom: 1px solid #e1e8ed; }
-        th { background: #3b3b98; color: white; font-weight: bold; position: sticky; top: 0; z-index: 10; }
-        tbody tr { transition: all 0.2s ease; }
-        tbody tr:hover { background-color: #f8f9fa; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .status-badge { padding: 5px 10px; border-radius: 15px; color: white; font-weight: bold; font-size: 12px; text-transform: uppercase; }
-        .status-active { background: #27ae60; }
-        .status-inactive { background: #c0392b; }
-        .action-buttons { display: flex; justify-content: center; gap: 5px; align-items: center; flex-wrap: wrap; }
-        .btn { color: white; padding: 6px 12px; border-radius: 5px; text-decoration: none; font-size: 12px; font-weight: bold; transition: all 0.3s ease; border: none; cursor: pointer; }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        :root {
+            --primary-color: #3b3b98;
+            --secondary-color: #575fcf;
+            --background-color: #f4f4f9;
+            --card-background: #fff;
+            --text-color: #2c2c54;
+            --gray-text: #6c757d;
+            --light-gray: #e1e8ed;
+            --shadow-light: rgba(0,0,0,0.1);
+            --shadow-medium: rgba(0,0,0,0.2);
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --info-color: #2980b9;
+            --error-color: #c0392b;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            padding: 20px; 
+            background: var(--background-color); 
+            margin: 0; 
+            color: var(--text-color);
+        }
+        
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        .search-section, .add-client-form, .clients-table-container { 
+            background: var(--card-background); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px var(--shadow-light); 
+            margin-bottom: 30px; 
+        }
+
+        .search-container { 
+            display: flex; 
+            gap: 15px; 
+            align-items: center; 
+            flex-wrap: wrap; 
+        }
+
+        .search-box { 
+            position: relative; 
+            flex: 1; 
+            min-width: 250px; 
+        }
+        
+        .search-input, .form-input, .filter-select { 
+            width: 100%; 
+            padding: 12px 15px; 
+            border: 2px solid var(--light-gray); 
+            border-radius: 8px; 
+            font-size: 16px; 
+            transition: all 0.3s ease; 
+            background: #f8f9fa; 
+            box-sizing: border-box; 
+            color: var(--text-color);
+        }
+
+        .search-input {
+            padding-right: 50px;
+        }
+
+        .search-input:focus, .form-input:focus, .filter-select:focus { 
+            outline: none; 
+            border-color: var(--primary-color); 
+            background: var(--card-background); 
+            box-shadow: 0 0 0 3px rgba(59, 59, 152, 0.1); 
+        }
+        
+        .search-icon { 
+            position: absolute; 
+            right: 15px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            color: var(--gray-text); 
+            font-size: 18px; 
+        }
+        
+        .clear-search { 
+            position: absolute; 
+            right: 45px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            background: none; 
+            border: none; 
+            color: var(--gray-text); 
+            font-size: 18px; 
+            cursor: pointer; 
+            padding: 5px; 
+            border-radius: 50%; 
+            display: none; 
+        }
+        
+        .clear-search:hover { 
+            background: #e9ecef; 
+            color: #495057; 
+        }
+
+        .search-filters { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+        }
+
+        .filter-select { 
+            padding: 10px 12px; 
+            border-radius: 8px; 
+            font-size: 14px; 
+        }
+
+        .search-stats { 
+            margin-top: 15px; 
+            padding: 10px; 
+            background: #e8f4fd; 
+            border-radius: 8px; 
+            color: #2c5aa0; 
+            font-size: 14px; 
+            display: none; 
+            font-weight: 500;
+        }
+
+        .form-row { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 20px; 
+        }
+        
+        .form-group { 
+            display: flex; 
+            flex-direction: column; 
+        }
+        
+        .form-button { 
+            background: var(--primary-color); 
+            color: white; 
+            padding: 14px 30px; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            align-self: flex-start;
+        }
+
+        .form-button:hover { 
+            background: var(--secondary-color); 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 15px rgba(59, 59, 152, 0.3); 
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            table-layout: fixed;
+        }
+        
+        /* Ajuste de compacidad */
+        th, td { 
+            padding: 10px 8px; /* Reducción de padding */
+            font-size: 13px; /* Reducción del tamaño de la fuente */
+            text-align: center; 
+            border-bottom: 1px solid var(--light-gray); 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th { 
+            background: var(--primary-color); 
+            color: white; 
+            font-weight: bold; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+        }
+        
+        tbody tr { 
+            transition: all 0.2s ease; 
+        }
+        
+        tbody tr:hover { 
+            background-color: #f8f9fa; 
+            transform: translateY(-1px); 
+            box-shadow: 0 2px 8px var(--shadow-light); 
+        }
+        
+        .status-badge { 
+            padding: 5px 10px; /* Reducción de padding */
+            border-radius: 20px; 
+            color: white; 
+            font-weight: bold; 
+            font-size: 11px; /* Reducción del tamaño de la fuente */
+            text-transform: uppercase; 
+            display: inline-block;
+        }
+
+        .status-active { background: var(--success-color); }
+        .status-inactive { background: var(--error-color); }
+        
+        .action-buttons { 
+            display: flex; 
+            justify-content: center; 
+            gap: 5px; /* Reducción de gap */
+            align-items: center; 
+            flex-wrap: wrap; 
+        }
+        
+        .btn { 
+            color: white; 
+            padding: 6px 12px; /* Reducción de padding */
+            border-radius: 6px; 
+            text-decoration: none; 
+            font-size: 12px; /* Reducción del tamaño de la fuente */
+            font-weight: bold; 
+            transition: all 0.3s ease; 
+            border: none; 
+            cursor: pointer; 
+            white-space: nowrap;
+        }
+
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 10px var(--shadow-medium); 
+        }
+        
         .btn-edit { background: #00a8ff; }
         .btn-edit:hover { background: #0097e6; }
-        .btn-activate { background: #27ae60; }
+        .btn-activate { background: var(--success-color); }
         .btn-activate:hover { background: #219a52; }
-        .btn-deactivate { background: #e84118; }
+        .btn-deactivate { background: var(--error-color); }
         .btn-deactivate:hover { background: #d63031; }
-        .no-results { text-align: center; padding: 40px; color: #6c757d; font-size: 18px; background: white; border-radius: 10px; margin-top: 20px; display: none; }
-        .highlight { background-color: yellow; padding: 1px 2px; border-radius: 2px; }
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px); min-width: 300px; max-width: 400px; padding: 15px 20px; border-radius: 10px; color: #fff; font-size: 16px; font-weight: bold; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.5s ease, transform 0.5s ease; z-index: 9999; }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        #toast.success { background-color: #27ae60; }
-        #toast.info { background-color: #2980b9; }
-        #toast.warning { background-color: #f39c12; }
-        #toast.error { background-color: #c0392b; }
-        h2 { color: #2c2c54; margin-bottom: 25px; font-size: 28px; }
-        h3 { color: #3b3b98; margin-bottom: 15px; font-size: 20px; }
+        
+        .no-results { 
+            text-align: center; 
+            padding: 50px; 
+            color: var(--gray-text); 
+            font-size: 18px; 
+            background: var(--card-background); 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px var(--shadow-light);
+            margin-top: 20px; 
+            display: none; 
+        }
+
+        .highlight { 
+            background-color: #ffeb3b; 
+            padding: 1px 2px; 
+            border-radius: 2px; 
+        }
+        
+        #toast { 
+            position: fixed; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%) translateY(-20px); 
+            min-width: 300px; 
+            max-width: 90%; 
+            padding: 18px 25px; 
+            border-radius: 12px; 
+            color: #fff; 
+            font-size: 16px; 
+            font-weight: bold; 
+            text-align: center; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+            opacity: 0; 
+            transition: opacity 0.5s ease, transform 0.5s ease; 
+            z-index: 9999; 
+        }
+        
+        #toast.show { 
+            opacity: 1; 
+            transform: translateX(-50%) translateY(0); 
+        }
+        
+        #toast.success { background-color: var(--success-color); }
+        #toast.info { background-color: var(--info-color); }
+        #toast.warning { background-color: var(--warning-color); }
+        #toast.error { background-color: var(--error-color); }
+        
+        h2 { 
+            color: var(--text-color); 
+            margin-bottom: 25px; 
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        h3 { 
+            color: var(--primary-color); 
+            margin-bottom: 20px; 
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 1024px) {
+            .clients-table-container {
+                overflow-x: auto;
+            }
+            table {
+                table-layout: auto;
+                min-width: 900px;
+            }
+            th, td {
+                padding: 10px 8px;
+            }
+            .search-filters {
+                flex-direction: column;
+                width: 100%;
+            }
+            .filter-select {
+                width: 100%;
+            }
+        }
+
         @media (max-width: 768px) {
-            .search-container { flex-direction: column; align-items: stretch; }
-            .search-box { min-width: auto; }
-            .form-row { grid-template-columns: 1fr; }
-            table { font-size: 12px; }
-            th, td { padding: 8px 4px; }
-            .action-buttons { flex-direction: column; gap: 3px; }
-            .btn { font-size: 11px; padding: 4px 8px; }
+            body { 
+                padding: 10px; 
+            }
+            main {
+                padding: 0;
+            }
+            .search-section, .add-client-form, .clients-table-container {
+                padding: 15px;
+            }
+            h2 {
+                font-size: 26px;
+                text-align: center;
+            }
+            h3 {
+                font-size: 20px;
+            }
+            .search-container { 
+                flex-direction: column; 
+                align-items: stretch; 
+                gap: 15px;
+            }
+            .search-box { 
+                min-width: auto; 
+            }
+            .search-filters {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .form-row { 
+                grid-template-columns: 1fr; 
+                gap: 15px;
+            }
+            .form-button {
+                width: 100%;
+                text-align: center;
+            }
+            
+            .clients-table-container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+            
+            table {
+                display: block;
+                width: 100%;
+            }
+            thead {
+                display: none;
+            }
+            tbody, tr, td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            tr {
+                margin-bottom: 15px;
+                background: white;
+                border: 1px solid var(--light-gray);
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                padding: 10px;
+            }
+            td {
+                text-align: right;
+                position: relative;
+                padding-left: 50%;
+                border-bottom: none;
+                white-space: normal;
+            }
+            td::before {
+                content: attr(data-label);
+                position: absolute;
+                left: 10px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+                color: var(--primary-color);
+            }
+            td:last-child {
+                border-bottom: 1px solid var(--light-gray);
+            }
+            .action-buttons {
+                flex-direction: row;
+                justify-content: space-around;
+                gap: 5px; /* Mantener la compacidad en móviles */
+            }
         }
     </style>
 </head>
@@ -323,14 +684,14 @@ $conn->close();
                 data-direccion="<?php echo htmlspecialchars($row['direccion']); ?>"
                 data-telefono="<?php echo htmlspecialchars($row['telefono']); ?>"
                 data-estado="<?php echo $row['activo'] ? 'activo' : 'inactivo'; ?>">
-                <td><?php echo $row['idCliente']; ?></td>
-                <td class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
-                <td class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
-                <td class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
-                <td class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
-                <td class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
-                <td class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
-                <td>
+                <td data-label="ID"><?php echo $row['idCliente']; ?></td>
+                <td data-label="Nombres" class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
+                <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
+                <td data-label="Tipo Doc." class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
+                <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
+                <td data-label="Dirección" class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
+                <td data-label="Teléfono" class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
+                <td data-label="Estado / Acciones">
                     <div class="action-buttons">
                         <span class="status-badge <?php echo $row['activo'] ? 'status-active' : 'status-inactive'; ?>">
                             <?php echo $row['activo'] ? 'Activo' : 'Inactivo'; ?>
@@ -539,6 +900,4 @@ $conn->close();
 
 <?php include(__DIR__ . "/includes/footer.php"); ?>
 </body>
-
 </html>
-
