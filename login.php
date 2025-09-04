@@ -21,7 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $row = $result->fetch_assoc();
 
     if ($row) {
-        if ($contrasena === $row['contrasena']) { // En producción usar hash
+        // === CAMBIO CRÍTICO: USO DE password_verify() ===
+        // Se asume que las contraseñas en la DB ya están hasheadas
+        if (password_verify($contrasena, $row['contrasena'])) {
             $_SESSION['idUsuario'] = $row['idUsuario'];
             $_SESSION['usuario'] = $row['usuario'];
             $_SESSION['rol'] = $row['nombreRol'];
@@ -31,10 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: index.php");
             exit();
         } else {
-            $mensaje = "Contraseña incorrecta.";
+            $mensaje = "Credenciales incorrectas.";
         }
     } else {
-        $mensaje = "Usuario no encontrado.";
+        $mensaje = "Credenciales incorrectas.";
     }
     
     $stmt->close();
@@ -50,7 +52,9 @@ $conn->close();
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Login - Aroma S.A.C</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+/* Variables y reseteo */
 :root {
     --primary-color: #6a11cb;
     --secondary-color: #2575fc;
@@ -58,6 +62,7 @@ $conn->close();
     --error-color: #e74c3c;
     --shadow-light: rgba(0, 0, 0, 0.1);
     --shadow-heavy: rgba(0, 0, 0, 0.25);
+    --bg-gradient: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
 }
 
 * {
@@ -66,61 +71,56 @@ $conn->close();
     padding: 0;
 }
 
+/* Cuerpo de la página */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    font-family: 'Poppins', sans-serif; /* Consistencia con el dashboard */
+    background: var(--bg-gradient);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    padding: 20px;
 }
 
+/* Contenedor del formulario de login */
 .login-container {
     background: rgba(255, 255, 255, 0.95);
-    padding: 40px 30px;
+    padding: clamp(30px, 5vw, 40px) clamp(25px, 5vw, 30px);
     border-radius: 20px;
     box-shadow: 0 8px 25px var(--shadow-heavy);
-    width: 90%;
+    width: 100%;
     max-width: 400px;
     text-align: center;
     backdrop-filter: blur(5px);
 }
 
-/* --- LOGO CIRCULAR (IMAGEN) --- */
+/* Logo circular */
 .logo img {
-    width: 100px; /* Tamaño del logo */
-    height: 100px; /* Tamaño del logo */
-    border-radius: 50%; /* Esto hace la imagen circular */
-    object-fit: cover; /* Asegura que la imagen cubra el círculo sin distorsionarse */
+    width: clamp(80px, 15vw, 100px);
+    height: clamp(80px, 15vw, 100px);
+    border-radius: 50%;
+    object-fit: cover;
     margin-bottom: 20px;
     box-shadow: 0 4px 15px var(--shadow-light);
 }
 
+/* Título */
 h1 {
     margin-bottom: 20px;
-    font-size: 28px;
+    font-size: clamp(24px, 5vw, 28px);
     color: var(--text-color);
     font-weight: bold;
 }
 
-.input-group {
+/* Grupos de input (usuario y contraseña) */
+.input-group, .password-input-group {
     position: relative;
     margin-bottom: 20px;
 }
 
-/* Posiciona el icono de usuario */
-.input-group .fa-user {
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #a0aec0;
-    transition: color 0.3s;
-}
-
-.input-group input {
+.input-group input, .password-input-group input {
     width: 100%;
-    padding: 12px 12px 12px 40px; /* Espacio para el icono de la izquierda */
+    padding: 12px 12px 12px 40px;
     border-radius: 10px;
     border: 1px solid #ccc;
     font-size: 16px;
@@ -128,19 +128,9 @@ h1 {
     transition: 0.3s;
 }
 
-.input-group input:focus {
-    border-color: var(--secondary-color);
-    box-shadow: 0 0 8px rgba(37, 117, 252, 0.3);
-}
-
-/* --- ESTILOS PARA EL CAMPO DE CONTRASEÑA CON DOS ÍCONOS --- */
-.password-input-group {
-    position: relative;
-    width: 100%;
-    margin-bottom: 20px;
-}
-
-.password-input-group .fa-lock { /* Posiciona el icono de candado */
+/* Posición de los iconos */
+.input-group .fa-user, 
+.password-input-group .fa-lock {
     position: absolute;
     left: 15px;
     top: 50%;
@@ -150,13 +140,7 @@ h1 {
 }
 
 .password-input-group input {
-    width: 100%;
-    padding: 12px 50px 12px 40px; /* Espacio a ambos lados */
-    border-radius: 10px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-    outline: none;
-    transition: 0.3s;
+    padding-right: 50px; /* Espacio para el icono de ver/ocultar */
 }
 
 .toggle-password {
@@ -175,25 +159,35 @@ h1 {
     color: var(--text-color);
 }
 
+/* Focus en los campos */
+.input-group input:focus, .password-input-group input:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 8px rgba(37, 117, 252, 0.3);
+}
+
+/* Botón de ingresar */
 .login-container button {
     width: 100%;
     padding: 12px;
-    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    background: var(--bg-gradient);
+    background-size: 200% 200%;
     color: white;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
     font-weight: bold;
-    transition: 0.3s;
+    transition: background-position 0.5s ease, transform 0.3s ease, box-shadow 0.3s ease;
     letter-spacing: 1px;
 }
 
 .login-container button:hover {
-    transform: scale(1.03);
+    transform: translateY(-2px);
     box-shadow: 0 5px 15px var(--shadow-light);
+    background-position: right center;
 }
 
+/* Mensaje de error */
 .error {
     color: var(--error-color);
     margin-bottom: 15px;
