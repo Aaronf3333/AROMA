@@ -48,7 +48,29 @@ if (isset($_SESSION['mensaje'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Boletas - Aroma S.A.C</title>
     <style>
-        /* Aquí va todo el CSS que ya tenías. No necesita cambios. */
+        /*
+        * A R Q U I T E C T U R A   C S S   M O D U L A R
+        * ----------------------------------------------
+        * He organizado el CSS en secciones para mejor lectura y mantenimiento.
+        * Las variables facilitan la modificación global de la paleta de colores.
+        */
+        :root {
+            --color-primary: #6c5ce7;
+            --color-secondary: #00b894;
+            --color-accent: #f0932b;
+            --color-background: #f5f6fa;
+            --color-card-bg: rgba(255, 255, 255, 0.95);
+            --color-text: #2d3436;
+            --color-light-text: #636e72;
+            --color-border: #e9ecef;
+            --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.08);
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 20px;
+        }
+
+        /* === Base Styles === */
         * {
             margin: 0;
             padding: 0;
@@ -57,8 +79,9 @@ if (isset($_SESSION['mensaje'])) {
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f6fa;
+            background: var(--color-background);
             min-height: 100vh;
+            color: var(--color-text);
         }
 
         .container {
@@ -67,6 +90,7 @@ if (isset($_SESSION['mensaje'])) {
             padding: 30px;
         }
 
+        /* === Page Header === */
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -77,7 +101,7 @@ if (isset($_SESSION['mensaje'])) {
         }
 
         .page-title {
-            color: #2d3436;
+            color: var(--color-text);
             font-size: 2.2rem;
             font-weight: 600;
             position: relative;
@@ -90,16 +114,16 @@ if (isset($_SESSION['mensaje'])) {
             left: 0;
             width: 80px;
             height: 3px;
-            background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+            background: linear-gradient(90deg, var(--color-primary), var(--color-primary), var(--color-primary));
             border-radius: 2px;
         }
 
         .add-button {
-            background: linear-gradient(135deg, #00b894, #00e676);
+            background: linear-gradient(135deg, var(--color-secondary), #00e676);
             color: white;
             padding: 15px 25px;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--border-radius-md);
             text-decoration: none;
             font-weight: 600;
             font-size: 16px;
@@ -107,6 +131,7 @@ if (isset($_SESSION['mensaje'])) {
             box-shadow: 0 6px 20px rgba(0, 184, 148, 0.3);
             text-transform: uppercase;
             letter-spacing: 1px;
+            white-space: nowrap; /* Evita que el texto se rompa */
         }
 
         .add-button:hover {
@@ -114,7 +139,7 @@ if (isset($_SESSION['mensaje'])) {
             box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4);
         }
 
-        /* Toast mejorado */
+        /* === Toast Notifications === */
         #toast {
             position: fixed;
             top: 20px;
@@ -123,7 +148,7 @@ if (isset($_SESSION['mensaje'])) {
             min-width: 350px;
             max-width: 500px;
             padding: 18px 25px;
-            border-radius: 12px;
+            border-radius: var(--border-radius-md);
             color: #fff;
             font-size: 16px;
             font-weight: 600;
@@ -141,7 +166,7 @@ if (isset($_SESSION['mensaje'])) {
         }
         
         #toast.success { 
-            background: linear-gradient(135deg, #00b894, #00a085);
+            background: linear-gradient(135deg, var(--color-secondary), #00a085);
             border-left: 4px solid #00e676;
         }
         
@@ -150,14 +175,14 @@ if (isset($_SESSION['mensaje'])) {
             border-left: 4px solid #f44336;
         }
 
-        /* Sección de búsqueda mejorada */
+        /* === Search Section === */
         .search-section {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--color-card-bg);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
+            border-radius: var(--border-radius-lg);
             padding: 35px;
             margin-bottom: 40px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-lg);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             overflow: hidden;
@@ -170,7 +195,7 @@ if (isset($_SESSION['mensaje'])) {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #6c5ce7, #a29bfe, #6c5ce7);
+            background: linear-gradient(90deg, var(--color-primary), #a29bfe, var(--color-primary));
         }
 
         .search-container {
@@ -189,7 +214,7 @@ if (isset($_SESSION['mensaje'])) {
         .search-input {
             width: 100%;
             padding: 16px 55px 16px 20px;
-            border: 2px solid #e9ecef;
+            border: 2px solid var(--color-border);
             border-radius: 25px;
             font-size: 16px;
             font-family: inherit;
@@ -199,7 +224,7 @@ if (isset($_SESSION['mensaje'])) {
 
         .search-input:focus {
             outline: none;
-            border-color: #6c5ce7;
+            border-color: var(--color-primary);
             box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
             background: rgba(255, 255, 255, 1);
         }
@@ -209,8 +234,9 @@ if (isset($_SESSION['mensaje'])) {
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            color: #6c757d;
+            color: var(--color-light-text);
             font-size: 18px;
+            pointer-events: none; /* No interfiere con el input */
         }
 
         .clear-search {
@@ -220,7 +246,7 @@ if (isset($_SESSION['mensaje'])) {
             transform: translateY(-50%);
             background: none;
             border: none;
-            color: #6c757d;
+            color: var(--color-light-text);
             font-size: 20px;
             cursor: pointer;
             padding: 8px;
@@ -231,7 +257,7 @@ if (isset($_SESSION['mensaje'])) {
 
         .clear-search:hover {
             background: rgba(108, 92, 231, 0.1);
-            color: #6c5ce7;
+            color: var(--color-primary);
         }
 
         .search-filters {
@@ -242,8 +268,8 @@ if (isset($_SESSION['mensaje'])) {
 
         .filter-select {
             padding: 12px 16px;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
+            border: 2px solid var(--color-border);
+            border-radius: var(--border-radius-md);
             background: rgba(255, 255, 255, 0.8);
             font-size: 14px;
             font-family: inherit;
@@ -253,7 +279,7 @@ if (isset($_SESSION['mensaje'])) {
 
         .filter-select:focus {
             outline: none;
-            border-color: #6c5ce7;
+            border-color: var(--color-primary);
             box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
         }
 
@@ -261,24 +287,24 @@ if (isset($_SESSION['mensaje'])) {
             margin-top: 20px;
             padding: 15px 20px;
             background: rgba(108, 92, 231, 0.1);
-            border-radius: 12px;
-            color: #6c5ce7;
+            border-radius: var(--border-radius-md);
+            color: var(--color-primary);
             font-size: 14px;
             font-weight: 600;
             display: none;
-            border-left: 4px solid #6c5ce7;
+            border-left: 4px solid var(--color-primary);
         }
 
-        /* Tabla mejorada */
+        /* === Table Section === */
         .table-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--color-card-bg);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
+            border-radius: var(--border-radius-lg);
             padding: 35px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-lg);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
-            overflow: hidden;
+            overflow: auto; /* Permite scroll horizontal en móviles */
         }
 
         .table-container::before {
@@ -296,13 +322,14 @@ if (isset($_SESSION['mensaje'])) {
             border-collapse: separate;
             border-spacing: 0;
             background: white;
-            border-radius: 12px;
+            border-radius: var(--border-radius-md);
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--shadow-md);
+            min-width: 700px; /* Asegura un ancho mínimo para la tabla */
         }
 
         .boletas-table th {
-            background: linear-gradient(135deg, #2d3436, #636e72);
+            background: linear-gradient(135deg, var(--color-text), #636e72);
             color: white;
             padding: 18px 15px;
             text-align: center;
@@ -316,20 +343,15 @@ if (isset($_SESSION['mensaje'])) {
             z-index: 10;
         }
 
-        .boletas-table th:first-child {
-            border-top-left-radius: 12px;
-        }
-
-        .boletas-table th:last-child {
-            border-top-right-radius: 12px;
-        }
+        .boletas-table th:first-child { border-top-left-radius: var(--border-radius-md); }
+        .boletas-table th:last-child { border-top-right-radius: var(--border-radius-md); }
 
         .boletas-table td {
             padding: 16px 15px;
             text-align: center;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--color-border);
             vertical-align: middle;
-            color: #2d3436;
+            color: var(--color-text);
             font-weight: 500;
             transition: all 0.2s ease;
         }
@@ -340,20 +362,19 @@ if (isset($_SESSION['mensaje'])) {
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
-        .boletas-table tr:last-child td {
-            border-bottom: none;
-        }
+        .boletas-table tr:last-child td { border-bottom: none; }
 
         .numero-boleta {
             font-weight: 700;
-            color: #6c5ce7;
+            color: var(--color-primary);
             font-size: 15px;
         }
 
         .total-amount {
             font-weight: 700;
-            color: #00b894;
+            color: var(--color-secondary);
             font-size: 16px;
+            white-space: nowrap;
         }
 
         .download-btn {
@@ -361,7 +382,7 @@ if (isset($_SESSION['mensaje'])) {
             color: white;
             padding: 10px 18px;
             border: none;
-            border-radius: 8px;
+            border-radius: var(--border-radius-sm);
             text-decoration: none;
             font-size: 13px;
             font-weight: 600;
@@ -369,6 +390,7 @@ if (isset($_SESSION['mensaje'])) {
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            white-space: nowrap;
         }
 
         .download-btn:hover {
@@ -381,29 +403,29 @@ if (isset($_SESSION['mensaje'])) {
             padding: 60px 20px;
             color: #74b9ff;
             font-size: 18px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            background: var(--color-card-bg);
+            border-radius: var(--border-radius-lg);
             margin-top: 20px;
             display: none;
             backdrop-filter: blur(10px);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-lg);
         }
 
         .no-results h3 {
             font-size: 24px;
             margin-bottom: 15px;
-            color: #2d3436;
+            color: var(--color-text);
         }
 
         .highlight {
-            background: linear-gradient(120deg, #f9ca24 0%, #f0932b 100%);
+            background: linear-gradient(120deg, var(--color-accent) 0%, #f0932b 100%);
             padding: 2px 4px;
             border-radius: 4px;
             color: white;
             font-weight: 600;
         }
 
-        /* Responsive Design */
+        /* === Responsive Design === */
         @media (max-width: 1024px) {
             .search-container {
                 flex-direction: column;
@@ -426,13 +448,18 @@ if (isset($_SESSION['mensaje'])) {
             
             .page-header {
                 flex-direction: column;
-                align-items: stretch;
+                align-items: center;
                 text-align: center;
             }
             
             .page-title {
                 font-size: 1.8rem;
                 margin-bottom: 15px;
+            }
+            
+            .page-title::after {
+                left: 50%;
+                transform: translateX(-50%);
             }
             
             .search-section, .table-container {
@@ -451,13 +478,15 @@ if (isset($_SESSION['mensaje'])) {
             .search-filters {
                 flex-direction: column;
                 gap: 10px;
+                width: 100%; /* Ocupan todo el ancho */
             }
             
             .filter-select {
                 min-width: auto;
+                width: 100%;
             }
         }
-
+        
         @media (max-width: 480px) {
             .boletas-table th,
             .boletas-table td {
@@ -469,7 +498,26 @@ if (isset($_SESSION['mensaje'])) {
                 padding: 8px 14px;
                 font-size: 11px;
             }
+
+            .search-input {
+                padding-right: 45px;
+            }
+
+            .clear-search {
+                right: 15px;
+            }
+            
+            .search-icon {
+                right: auto;
+                left: 15px;
+                display: none; /* Ocultar el icono de la lupa para ganar espacio */
+            }
+
+            .search-input:focus ~ .search-icon {
+                display: none;
+            }
         }
+
     </style>
 </head>
 <body>
@@ -495,7 +543,7 @@ if (isset($_SESSION['mensaje'])) {
         <div class="search-section">
             <div class="search-container">
                 <div class="search-box">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Buscar por número de boleta, cliente, cajero..." autocomplete="off">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Buscar por número, cliente o cajero..." autocomplete="off">
                     <span class="search-icon">🔍</span>
                     <button class="clear-search" id="clearSearch">✕</button>
                 </div>
@@ -535,7 +583,8 @@ if (isset($_SESSION['mensaje'])) {
                 <tbody id="boletasTableBody">
                     <?php 
                     // Bucle para mostrar los resultados de MySQLi
-                    while($row = $result->fetch_assoc()): 
+                    if ($result->num_rows > 0):
+                        while($row = $result->fetch_assoc()): 
                     ?>
                     <tr data-numero="<?php echo htmlspecialchars($row['numeroBoleta']); ?>" 
                         data-cliente="<?php echo htmlspecialchars($row['clienteNombres'].' '.$row['clienteApellidos']); ?>" 
@@ -549,17 +598,30 @@ if (isset($_SESSION['mensaje'])) {
                         <td class="cliente-boleta"><?php echo htmlspecialchars($row['clienteNombres'].' '.$row['clienteApellidos']); ?></td>
                         <td><span class="total-amount">S/. <?php echo number_format($row['total'], 2); ?></span></td>
                         <td>
-                            <a href="descargar_boleta.php?id=<?php echo htmlspecialchars($row['idBoleta']); ?>" class="download-btn">📥 Descargar PDF</a>
+                            <a href="descargar_boleta.php?id=<?php echo htmlspecialchars($row['idBoleta']); ?>" class="download-btn">📥 PDF</a>
                         </td>
                     </tr>
-                    <?php endwhile; ?>
+                    <?php 
+                        endwhile; 
+                    else: 
+                    ?>
+                    <tr>
+                        <td colspan="7">
+                            <div class="no-results-table">
+                                <h3>No hay boletas registradas</h3>
+                                <p>Comienza generando tu primera boleta.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php
+                    endif;
+                    ?>
                 </tbody>
             </table>
         </div>
-
         <div class="no-results" id="noResults">
             <h3>😔 No se encontraron resultados</h3>
-            <p>Intenta con otros términos de búsqueda o ajusta los filtros</p>
+            <p>Intenta con otros términos de búsqueda o ajusta los filtros.</p>
         </div>
     </div>
 
@@ -587,11 +649,12 @@ if (isset($_SESSION['mensaje'])) {
         // Función para limpiar highlights
         function clearHighlights() {
             document.querySelectorAll('.highlight').forEach(el => {
-                el.outerHTML = el.innerHTML;
+                const parent = el.parentNode;
+                parent.innerHTML = parent.textContent;
             });
         }
         
-        // Función para filtrar y ordenar
+        // Función principal para filtrar y ordenar
         function filterAndSort() {
             const searchTerm = searchInput.value.toLowerCase().trim();
             const filterType = filterBy.value;
@@ -618,6 +681,7 @@ if (isset($_SESSION['mensaje'])) {
                         searchText = row.dataset.fecha.toLowerCase();
                         break;
                     default:
+                        // Busca en todos los data-attributes si no hay filtro
                         searchText = `${row.dataset.numero} ${row.dataset.cliente} ${row.dataset.cajero} ${row.dataset.fecha}`.toLowerCase();
                 }
                 
@@ -655,27 +719,15 @@ if (isset($_SESSION['mensaje'])) {
                 
                 // Agregar filas filtradas y resaltar texto
                 visibleRows.forEach(row => {
-                    if (searchTerm && filterType !== 'all') {
-                        // Resaltar solo en la columna específica
-                        const targetClass = {
-                            'numero': 'numero-boleta',
-                            'cliente': 'cliente-boleta',
-                            'cajero': 'cajero-boleta',
-                            'fecha': 'fecha-boleta'
-                        }[filterType];
-                        
-                        if (targetClass) {
-                            const targetCell = row.querySelector(`.${targetClass}`);
-                            if (targetCell) {
-                                targetCell.innerHTML = highlightText(targetCell.textContent, searchTerm);
-                            }
-                        }
-                    } else if (searchTerm) {
-                        // Resaltar en todas las columnas
+                    if (searchTerm) {
+                        // Resaltar en la columna adecuada
                         ['numero-boleta', 'cliente-boleta', 'cajero-boleta', 'fecha-boleta'].forEach(className => {
                             const cell = row.querySelector(`.${className}`);
                             if (cell) {
-                                cell.innerHTML = highlightText(cell.textContent, searchTerm);
+                                // Aplicar el resaltado solo si el filtro es 'all' o coincide con la columna
+                                if (filterType === 'all' || (filterType === 'numero' && className === 'numero-boleta') || (filterType === 'cliente' && className === 'cliente-boleta') || (filterType === 'cajero' && className === 'cajero-boleta') || (filterType === 'fecha' && className === 'fecha-boleta')) {
+                                    cell.innerHTML = highlightText(cell.textContent, searchTerm);
+                                }
                             }
                         });
                     }
