@@ -240,10 +240,11 @@ body {
     box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
 
-.table-container {
+/* New responsive table styles */
+.responsive-table-container {
     background: white;
     border-radius: 16px;
-    overflow: hidden;
+    overflow-x: auto; /* Enable horizontal scrolling */
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     border: 1px solid var(--border-color);
 }
@@ -566,14 +567,57 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         align-items: stretch;
     }
     
-    table {
-        font-size: 0.9rem;
+    .responsive-table-container {
+        overflow-x: auto;
     }
     
-    th, td {
-        padding: 0.8rem 0.5rem;
+    /* Hide table headers on mobile */
+    thead {
+        display: none;
     }
     
+    table, tbody, tr, td {
+        display: block;
+        width: 100%;
+    }
+    
+    tr {
+        margin-bottom: 1rem;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
+        border-bottom: none;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    td:first-child {
+        border-top: none;
+    }
+    
+    td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 0;
+        width: 45%;
+        padding-left: 1rem;
+        font-weight: 600;
+        text-align: left;
+        color: var(--text-secondary);
+    }
+    
+    /* Hide the password toggle on mobile to avoid layout issues */
+    .password-toggle {
+        display: none;
+    }
+
     .modal-content {
         margin: 20px;
         width: calc(100% - 40px);
@@ -639,7 +683,7 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                 </button>
             </div>
 
-            <div class="table-container">
+            <div class="responsive-table-container">
                 <table>
                     <thead>
                         <tr>
@@ -659,37 +703,37 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                             while($row = $resultUsuarios->fetch_assoc()): ?>
                             <tr>
                                 <form method="POST" onsubmit="showLoading(this)">
-                                    <td>
+                                    <td data-label="ID">
                                         <strong><?php echo $row['idUsuario']; ?></strong>
                                         <input type="hidden" name="idUsuario" value="<?php echo $row['idUsuario']; ?>">
                                     </td>
-                                    <td>
+                                    <td data-label="Nombre Completo">
                                         <div class="user-info">
                                             <strong><?php echo htmlspecialchars($row['nombres'].' '.$row['apellidos']); ?></strong>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Correo">
                                         <input type="text" name="usuario" value="<?php echo htmlspecialchars($row['usuario']); ?>" required>
                                     </td>
-                                    <td>
+                                    <td data-label="Contraseña">
                                         <div class="password-container">
                                             <input type="password" name="contrasena" value="<?php echo htmlspecialchars($row['contrasena']); ?>" 
                                                    class="pass-input-<?php echo $row['idUsuario']; ?>" required>
                                             <i class="fas fa-eye password-toggle" onclick="togglePass(<?php echo $row['idUsuario']; ?>)"></i>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Dirección">
                                         <input type="text" name="direccion" value="<?php echo htmlspecialchars($row['direccion']); ?>">
                                     </td>
-                                    <td>
+                                    <td data-label="Teléfono">
                                         <input type="text" name="telefono" value="<?php echo htmlspecialchars($row['telefono']); ?>">
                                     </td>
-                                    <td>
+                                    <td data-label="Rol">
                                         <span class="badge">
                                             <?php echo $row['nombreRol']; ?>
                                         </span>
                                     </td>
-                                    <td>
+                                    <td data-label="Acciones">
                                         <button type="submit" name="editar" class="btn btn-success">
                                             <i class="fas fa-save"></i> Guardar
                                         </button>
