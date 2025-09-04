@@ -1,10 +1,6 @@
 <?php
 session_start();
 
-if (!isset($_SESSION['idUsuario'])) {
-    header("Location: login.php");
-    exit();
-}
 include(__DIR__ . "/conexion.php"); // Conexión a MySQL
 
 // === CONSULTAS ===
@@ -412,3 +408,4 @@ body {
 </body>
 
 </html>
+
