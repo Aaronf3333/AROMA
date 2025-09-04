@@ -3,6 +3,11 @@ session_start();
 
 include(__DIR__ . "/conexion.php"); // Conexión a MySQL
 
+if (!isset($_SESSION['idUsuario'])) {
+    header("Location: login.php");
+    exit();
+}
+
 // === CONSULTAS ===
 
 // Ventas Hoy
@@ -32,10 +37,10 @@ $totalProductos = $resultProd->fetch_assoc()['productos'];
 
 // Ventas últimos 7 días
 $sqlSemana = "SELECT DATE(fechaVenta) as fecha, SUM(total) as total
-             FROM venta
-             WHERE fechaVenta >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-             GROUP BY DATE(fechaVenta)
-             ORDER BY fecha ASC";
+              FROM venta
+              WHERE fechaVenta >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+              GROUP BY DATE(fechaVenta)
+              ORDER BY fecha ASC";
 $dataSemana = [];
 $resultSemana = $conn->query($sqlSemana);
 while($row = $resultSemana->fetch_assoc()) {
@@ -44,10 +49,10 @@ while($row = $resultSemana->fetch_assoc()) {
 
 // Ventas por Mes (año actual)
 $sqlMeses = "SELECT MONTH(fechaVenta) as mes, SUM(total) as total
-             FROM venta
-             WHERE YEAR(fechaVenta) = YEAR(NOW())
-             GROUP BY MONTH(fechaVenta)
-             ORDER BY mes ASC";
+              FROM venta
+              WHERE YEAR(fechaVenta) = YEAR(NOW())
+              GROUP BY MONTH(fechaVenta)
+              ORDER BY mes ASC";
 $dataMeses = [];
 $resultMeses = $conn->query($sqlMeses);
 while($row = $resultMeses->fetch_assoc()) {
@@ -56,11 +61,11 @@ while($row = $resultMeses->fetch_assoc()) {
 
 // Top productos
 $sqlTop = "SELECT p.nombreProducto, SUM(dv.cantidad) as totalVendidos
-           FROM detalleventa dv
-           JOIN producto p ON dv.idProducto = p.idProducto
-           GROUP BY p.nombreProducto
-           ORDER BY totalVendidos DESC
-           LIMIT 5";
+            FROM detalleventa dv
+            JOIN producto p ON dv.idProducto = p.idProducto
+            GROUP BY p.nombreProducto
+            ORDER BY totalVendidos DESC
+            LIMIT 5";
 $dataTop = [];
 $resultTop = $conn->query($sqlTop);
 while($row = $resultTop->fetch_assoc()) {
@@ -69,9 +74,9 @@ while($row = $resultTop->fetch_assoc()) {
 
 // Ingresos por Año
 $sqlAnios = "SELECT YEAR(fechaVenta) as anio, SUM(total) as total
-             FROM venta
-             GROUP BY YEAR(fechaVenta)
-             ORDER BY anio ASC";
+              FROM venta
+              GROUP BY YEAR(fechaVenta)
+              ORDER BY anio ASC";
 $dataAnios = [];
 $resultAnios = $conn->query($sqlAnios);
 while($row = $resultAnios->fetch_assoc()) {
@@ -82,134 +87,190 @@ while($row = $resultAnios->fetch_assoc()) {
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard - Aroma S.A.C</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-/* Variables de color */
-:root {
-    --primary-color: #34495e; /* Gris oscuro */
-    --secondary-color: #2c3e50; /* Gris más oscuro */
-    --accent-color: #27ae60; /* Verde esmeralda */
-    --background-color: #ecf0f1; /* Gris claro */
-    --card-background: #ffffff; /* Blanco */
-    --text-light: #7f8c8d; /* Gris para texto secundario */
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Aroma S.A.C</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Variables de color */
+        :root {
+            --primary-color: #34495e;
+            --secondary-color: #2c3e50;
+            --accent-color: #27ae60;
+            --background-color: #ecf0f1;
+            --card-background: #ffffff;
+            --text-light: #7f8c8d;
+        }
 
-body {
-    font-family: 'Poppins', sans-serif;
-    background-color: var(--background-color);
-    margin: 0;
-    padding: 0;
-    color: var(--primary-color);
-}
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+            color: var(--primary-color);
+            line-height: 1.6;
+        }
 
-.dashboard-container {
-    max-width: 1200px;
-    margin: 30px auto;
-    padding: 0 20px;
-}
+        /* Contenedor principal para centrar el contenido */
+        .dashboard-container {
+            width: 95%;
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
 
-.header {
-    text-align: center;
-    margin-bottom: 40px;
-}
+        /* Título del dashboard */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
 
-.header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--secondary-color);
-    position: relative;
-    display: inline-block;
-}
+        .header h1 {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 700;
+            color: var(--secondary-color);
+            position: relative;
+            display: inline-block;
+        }
 
-.header h1::after {
-    content: '';
-    display: block;
-    width: 80px;
-    height: 4px;
-    background-color: var(--accent-color);
-    margin: 10px auto 0;
-    border-radius: 2px;
-}
+        .header h1::after {
+            content: '';
+            display: block;
+            width: clamp(50px, 10vw, 80px);
+            height: 3px;
+            background-color: var(--accent-color);
+            margin: 10px auto 0;
+            border-radius: 2px;
+        }
 
-/* Sección de tarjetas */
-.info-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 25px;
-    margin-bottom: 40px;
-}
+        /* Sección de tarjetas informativas */
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
 
-.card {
-    background-color: var(--card-background);
-    border-radius: 15px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-    padding: 25px;
-    display: flex;
-    align-items: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
+        .card {
+            background-color: var(--card-background);
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            flex-wrap: wrap;
+            text-align: center;
+            justify-content: center;
+        }
 
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
-}
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+        }
 
-.card-icon {
-    font-size: 2rem;
-    margin-right: 20px;
-    color: var(--accent-color);
-}
+        .card-icon {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+        }
 
-.card-content h3 {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-light);
-    text-transform: uppercase;
-}
+        .card-content h3 {
+            margin: 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
 
-.card-content p {
-    margin: 5px 0 0;
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: var(--secondary-color);
-}
+        .card-content p {
+            margin: 3px 0 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
 
-/* Sección de gráficos */
-.charts-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-    gap: 30px;
-}
+        @media (max-width: 575px) {
+            .card {
+                flex-direction: column;
+            }
+            .card-icon {
+                margin-right: 0;
+            }
+        }
 
-.chart-container {
-    background-color: var(--card-background);
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-}
+        /* Sección de gráficos */
+        .charts-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
 
-/* Gráficos específicos */
-#ventasSemana, #ventasMeses {
-    height: 350px;
-}
+        .chart-container {
+            background-color: var(--card-background);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            position: relative;
+        }
 
-#topProductos, #ventasAnios {
-    height: 350px;
-}
+        /* Gráficos específicos */
+        .chart-container canvas {
+            height: 40vh !important;
+            max-height: 400px;
+            width: 100% !important;
+        }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .charts-section {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
+        /* Media Queries para diferentes tamaños de pantalla */
+
+        /* Tabletas (dispositivos medianos) */
+        @media (min-width: 768px) {
+            .info-cards {
+                gap: 20px;
+            }
+
+            .card {
+                padding: 25px;
+                flex-direction: row;
+                text-align: left;
+                justify-content: flex-start;
+            }
+
+            .card-icon {
+                font-size: 2.5rem;
+                margin-right: 20px;
+                margin-bottom: 0;
+            }
+            
+            .card-content h3 {
+                font-size: 0.9rem;
+            }
+            
+            .card-content p {
+                font-size: 1.8rem;
+            }
+
+            .charts-section {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 25px;
+            }
+
+            .chart-container canvas {
+                height: 300px !important;
+            }
+        }
+
+        /* Escritorios (dispositivos grandes) */
+        @media (min-width: 1024px) {
+            .charts-section {
+                gap: 30px;
+            }
+        }
+    </style>
 </head>
 <body>
     <?php include(__DIR__ . "/includes/header.php"); ?>
@@ -280,10 +341,10 @@ body {
     const ventasAnio = <?php echo json_encode($ventasAnio); ?>;
     const totalClientes = <?php echo json_encode($totalClientes); ?>;
     const totalProductos = <?php echo json_encode($totalProductos); ?>;
-    const dataSemana = <?php echo json_encode($dataSemana); ?>;
-    const dataMeses = <?php echo json_encode($dataMeses); ?>;
-    const dataTop = <?php echo json_encode($dataTop); ?>;
-    const dataAnios = <?php echo json_encode($dataAnios); ?>;
+    const dataSemana = <?php echo json_encode(array_values($dataSemana)); ?>;
+    const dataMeses = <?php echo json_encode(array_values($dataMeses)); ?>;
+    const dataTop = <?php echo json_encode(array_values($dataTop)); ?>;
+    const dataAnios = <?php echo json_encode(array_values($dataAnios)); ?>;
 
     // Configuración de los gráficos
     Chart.defaults.font.family = 'Poppins, sans-serif';
@@ -406,6 +467,4 @@ body {
     <?php include(__DIR__ . "/includes/footer.php"); ?>
 
 </body>
-
 </html>
-
