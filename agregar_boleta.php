@@ -1,6 +1,10 @@
 <?php
 session_start();
 include(__DIR__ . "/conexion.php"); // Asegúrate de que este archivo ahora conecta a MySQL
+
+// Configurar codificación UTF-8 para MySQL
+mysqli_set_charset($conn, "utf8");
+
 require(__DIR__ . "/fpdf/fpdf.php");
 
 if (!isset($_SESSION['idUsuario'])) {
@@ -27,26 +31,39 @@ $resultProductos = mysqli_query($conn, $sqlProductos);
 // PROCESAR VENTA
 // -------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // La lógica de procesamiento de venta y generación de PDF es la misma.
-    // Solo se añadieron comentarios para mayor claridad.
     $idCliente = intval($_POST['idCliente']);
-    $productosSeleccionados = $_POST['productos']; 
+    $productosSeleccionados = $_POST['productos'] ?? []; 
     $montoPagado = floatval($_POST['monto_pagado']);
     $cambio = floatval($_POST['cambio_hidden']);
     $total = 0;
     $detalleProductos = [];
 
-    // Calcular el total y preparar el detalle de productos
-    foreach ($productosSeleccionados as $idProd => $cant) {
-        $cantidad = intval($cant['cantidad']);
-        $precioUnitario = floatval($cant['precioUnitario']);
-        $subtotal = $cantidad * $precioUnitario;
-        $total += $subtotal;
-        $detalleProductos[$idProd] = [
-            'cantidad' => $cantidad,
-            'precioUnitario' => $precioUnitario,
-            'nombre' => $cant['nombre']
-        ];
+    // Filtrar solo productos con cantidad válida y calcular el total
+    foreach ($productosSeleccionados as $idProd => $data) {
+        // Verificar que existan las claves necesarias y que la cantidad sea válida
+        if (isset($data['cantidad']) && isset($data['precioUnitario']) && isset($data['nombre'])) {
+            $cantidad = intval($data['cantidad']);
+            $precioUnitario = floatval($data['precioUnitario']);
+            
+            // Solo procesar si la cantidad es mayor a 0 (productos realmente seleccionados)
+            if ($cantidad > 0) {
+                $subtotal = $cantidad * $precioUnitario;
+                $total += $subtotal;
+                $detalleProductos[$idProd] = [
+                    'cantidad' => $cantidad,
+                    'precioUnitario' => $precioUnitario,
+                    'nombre' => $data['nombre']
+                ];
+            }
+        }
+    }
+
+    // Verificar que hay productos seleccionados
+    if (empty($detalleProductos)) {
+        $_SESSION['mensaje'] = "Debe seleccionar al menos un producto.";
+        $_SESSION['tipo'] = "error";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
     }
 
     // Iniciar una transacción para asegurar la integridad de los datos
@@ -60,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $idVenta = mysqli_insert_id($conn);
         mysqli_stmt_close($stmtVenta);
 
-        // 2. Insertar Detalle de Venta
+        // 2. Insertar Detalle de Venta (solo productos seleccionados)
         $sqlDetalle = "INSERT INTO detalleventa (idVenta, idProducto, cantidad, precioUnitario) VALUES (?, ?, ?, ?)";
         $stmtDetalle = mysqli_prepare($conn, $sqlDetalle);
         foreach ($detalleProductos as $idProd => $data) {
@@ -69,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         mysqli_stmt_close($stmtDetalle);
 
-        // 3. Generar PDF (código FPDF)
+        // 3. Generar PDF con codificación UTF-8 corregida
         $pdf = new FPDF('P','mm',array(80,200));
         $pdf->AddPage();
         $pdf->SetMargins(3, 5, 3);
@@ -82,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->SetFont('Arial','B',11);
         $pdf->Rect(3, 5, $anchoEfectivo, 13, 'F');
         $pdf->SetXY(3, 6);
-        $pdf->Cell($anchoEfectivo,7,'NOTA DE VENTA',0,1,'C',false);
+        $pdf->Cell($anchoEfectivo,7,utf8_decode('NOTA DE VENTA'),0,1,'C',false);
         $pdf->SetFont('Arial','B',9);
         $pdf->SetX(3);
         $pdf->Cell($anchoEfectivo,6,'Aroma S.A.C',0,1,'C',false);
@@ -90,13 +107,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->SetTextColor(0,0,0);
         $pdf->SetFont('Arial','',8);
         $pdf->Ln(3);
-        $pdf->Cell($anchoEfectivo,4,'Cajero: '.$usuarioNombre,0,1,'C');
+        $pdf->Cell($anchoEfectivo,4,utf8_decode('Cajero: '.$usuarioNombre),0,1,'C');
         $pdf->Ln(1);
         
         $ruc = "10345678901";
         $numeroBoleta = 'BOL'.str_pad($idVenta,5,'0',STR_PAD_LEFT);
         $pdf->Cell($anchoEfectivo,4,'RUC: '.$ruc,0,1,'C');
-        $pdf->Cell($anchoEfectivo,4,'Nro: '.$numeroBoleta,0,1,'C');
+        $pdf->Cell($anchoEfectivo,4,utf8_decode('Nro: '.$numeroBoleta),0,1,'C');
         
         date_default_timezone_set('America/Lima');
         $fechaEmision = date('d/m/Y H:i:s');
@@ -117,16 +134,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo,5,'CLIENTE',0,1,'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial','',7);
-        $pdf->Cell($anchoEfectivo,4,$cliente['nombres'].' '.$cliente['apellidos'],0,1,'L');
+        $pdf->Cell($anchoEfectivo,4,utf8_decode($cliente['nombres'].' '.$cliente['apellidos']),0,1,'L');
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo,4,$cliente['tipoDocumento'].': '.$cliente['numeroDocumento'],0,1,'L');
+        $pdf->Cell($anchoEfectivo,4,utf8_decode($cliente['tipoDocumento'].': '.$cliente['numeroDocumento']),0,1,'L');
         if(!empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo,4,'Dir: '.$cliente['direccion'],0,1,'L');
+            $pdf->Cell($anchoEfectivo,4,utf8_decode('Dir: '.$cliente['direccion']),0,1,'L');
         }
         if(!empty($cliente['telefono'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo,4,'Tel: '.$cliente['telefono'],0,1,'L');
+            $pdf->Cell($anchoEfectivo,4,utf8_decode('Tel: '.$cliente['telefono']),0,1,'L');
         }
         $pdf->Ln(5);
 
@@ -152,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
-            $pdf->Cell($anchoProducto,6,$nombreProducto,1,0,'L',$alternar);
+            $pdf->Cell($anchoProducto,6,utf8_decode($nombreProducto),1,0,'L',$alternar);
             $pdf->Cell($anchoCantidad,6,$data['cantidad'],1,0,'C',$alternar);
             $pdf->Cell($anchoPrecio,6,'S/ '.number_format($data['precioUnitario'],2),1,0,'R',$alternar);
             $pdf->Cell($anchoSubtotal,6,'S/ '.number_format($data['cantidad']*$data['precioUnitario'],2),1,1,'R',$alternar);
@@ -177,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(5);
         $pdf->SetFont('Arial','B',8);
         $pdf->SetTextColor(0,0,0);
-        $pdf->Cell($anchoEfectivo,5,'DETALLE DE PAGO',0,1,'L');
+        $pdf->Cell($anchoEfectivo,5,utf8_decode('DETALLE DE PAGO'),0,1,'L');
         $pdf->Ln(1);
 
         $pdf->SetFont('Arial','',8);
@@ -560,6 +577,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background-color: #ff9800;
         }
 
+        .toast.error {
+            background-color: #f44336;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             body {
@@ -604,6 +625,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1 class="page-title">💼 Generar Nueva Boleta</h1>
         
         <div class="main-card">
+            <?php if (isset($_SESSION['mensaje'])): ?>
+                <div class="toast show <?php echo $_SESSION['tipo']; ?>" id="toast">
+                    <?php 
+                    echo $_SESSION['mensaje']; 
+                    unset($_SESSION['mensaje'], $_SESSION['tipo']);
+                    ?>
+                </div>
+            <?php endif; ?>
+
             <form method="POST" id="formBoleta">
                 <div class="form-section">
                     <h3 class="section-title">👤 Seleccionar Cliente</h3>
@@ -629,7 +659,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        class="product-checkbox"
                                        data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
                                        data-precio="<?php echo $prod['precio']; ?>"
-                                       value="<?php echo $prod['idProducto']; ?>">
+                                       value="<?php echo $prod['idProducto']; ?>"
+                                       id="product_<?php echo $prod['idProducto']; ?>">
 
                                 <div class="product-details">
                                     <div class="product-name"><?php echo htmlspecialchars($prod['nombreProducto']); ?></div>
@@ -706,6 +737,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (selectedProducts.length === 0) {
                     summaryPanel.style.display = 'none';
+                    submitBtn.disabled = true;
                     return;
                 }
 
@@ -763,6 +795,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     item.classList.toggle('selected', target.checked);
                     quantityInput.disabled = !target.checked;
+                    
                     if (!target.checked) {
                         quantityInput.value = 1;
                     }
@@ -787,6 +820,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return;
                 }
 
+                if (!clienteSelect.value) {
+                    e.preventDefault();
+                    showToast('Por favor, selecciona un cliente.', 'warning');
+                    return;
+                }
+
+                const montoPagado = parseFloat(montoPagadoInput.value) || 0;
+                if (montoPagado < total) {
+                    e.preventDefault();
+                    showToast('El monto pagado debe ser mayor o igual al total.', 'warning');
+                    return;
+                }
+
+                // Desactivar productos no seleccionados para que no se envíen
+                const unselectedItems = productsList.querySelectorAll('.product-item:not(.selected)');
+                unselectedItems.forEach(item => {
+                    const inputs = item.querySelectorAll('input[name^="productos"]');
+                    inputs.forEach(input => {
+                        input.disabled = true;
+                    });
+                });
+
                 // Ocultar el botón para evitar doble clic
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Procesando...';
@@ -795,6 +850,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 document.getElementById('montoPagadoHidden').value = montoPagadoInput.value;
                 document.getElementById('cambioHidden').value = parseFloat(cambioAmountSpan.textContent.replace('S/. ', '')) || 0;
             });
+            
+            // Auto-hide toast messages
+            if (document.querySelector('.toast.show')) {
+                setTimeout(() => {
+                    const existingToast = document.querySelector('.toast.show');
+                    if (existingToast) {
+                        existingToast.classList.remove('show');
+                    }
+                }, 5000);
+            }
             
             // Inicializar el estado al cargar la página
             updateTotal();
