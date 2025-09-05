@@ -32,21 +32,20 @@ $resultProductos = mysqli_query($conn, $sqlProductos);
 // -------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $idCliente = intval($_POST['idCliente']);
-    $productosSeleccionados = $_POST['productos'] ?? []; 
+    $productosSeleccionados = $_POST['productos'] ?? [];    
     $montoPagado = floatval($_POST['monto_pagado']);
     $cambio = floatval($_POST['cambio_hidden']);
     $total = 0;
     $detalleProductos = [];
 
-    // Filtrar solo productos con cantidad válida y calcular el total
+    // Validar y filtrar solo productos con cantidad válida
     foreach ($productosSeleccionados as $idProd => $data) {
-        // Verificar que existan las claves necesarias y que la cantidad sea válida
-        if (isset($data['cantidad']) && isset($data['precioUnitario']) && isset($data['nombre'])) {
+        if (isset($data['cantidad']) && !empty($data['cantidad']) && isset($data['precioUnitario']) && isset($data['nombre'])) {
             $cantidad = intval($data['cantidad']);
             $precioUnitario = floatval($data['precioUnitario']);
             
-            // Solo procesar si la cantidad es mayor a 0 (productos realmente seleccionados)
-            if ($cantidad > 0) {
+            // Solo procesar si la cantidad es mayor a 0 y el precio es mayor a 0
+            if ($cantidad > 0 && $precioUnitario > 0) {
                 $subtotal = $cantidad * $precioUnitario;
                 $total += $subtotal;
                 $detalleProductos[$idProd] = [
@@ -58,9 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Verificar que hay productos seleccionados
+    // Verificar que hay productos seleccionados después de la validación
     if (empty($detalleProductos)) {
-        $_SESSION['mensaje'] = "Debe seleccionar al menos un producto.";
+        $_SESSION['mensaje'] = "Debe seleccionar al menos un producto con una cantidad válida.";
         $_SESSION['tipo'] = "error";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
@@ -77,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $idVenta = mysqli_insert_id($conn);
         mysqli_stmt_close($stmtVenta);
 
-        // 2. Insertar Detalle de Venta (solo productos seleccionados)
+        // 2. Insertar Detalle de Venta
         $sqlDetalle = "INSERT INTO detalleventa (idVenta, idProducto, cantidad, precioUnitario) VALUES (?, ?, ?, ?)";
         $stmtDetalle = mysqli_prepare($conn, $sqlDetalle);
         foreach ($detalleProductos as $idProd => $data) {
@@ -86,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         mysqli_stmt_close($stmtDetalle);
 
-        // 3. Generar PDF con codificación UTF-8 corregida
+        // 3. Generar PDF
         $pdf = new FPDF('P','mm',array(80,200));
         $pdf->AddPage();
         $pdf->SetMargins(3, 5, 3);
@@ -248,7 +247,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Exception $e) {
         // En caso de error, deshacer la transacción
         mysqli_rollback($conn);
-        die("Error en la transacción: " . $e->getMessage());
+        $_SESSION['mensaje'] = "Error en la transacción: " . $e->getMessage();
+        $_SESSION['tipo'] = "error";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
     }
 }
 ?>
@@ -656,11 +658,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php while($prod = mysqli_fetch_assoc($resultProductos)): ?>
                             <div class="product-item" data-id="<?php echo $prod['idProducto']; ?>">
                                 <input type="checkbox"
-                                       class="product-checkbox"
-                                       data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
-                                       data-precio="<?php echo $prod['precio']; ?>"
-                                       value="<?php echo $prod['idProducto']; ?>"
-                                       id="product_<?php echo $prod['idProducto']; ?>">
+                                        class="product-checkbox"
+                                        data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
+                                        data-precio="<?php echo $prod['precio']; ?>"
+                                        value="<?php echo $prod['idProducto']; ?>"
+                                        id="product_<?php echo $prod['idProducto']; ?>">
 
                                 <div class="product-details">
                                     <div class="product-name"><?php echo htmlspecialchars($prod['nombreProducto']); ?></div>
@@ -668,11 +670,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
 
                                 <input type="number"
-                                       name="productos[<?php echo $prod['idProducto']; ?>][cantidad]"
-                                       class="product-quantity"
-                                       min="1"
-                                       value="1"
-                                       disabled>
+                                        name="productos[<?php echo $prod['idProducto']; ?>][cantidad]"
+                                        class="product-quantity"
+                                        min="1"
+                                        value="1"
+                                        disabled>
 
                                 <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][precioUnitario]" value="<?php echo $prod['precio']; ?>">
                                 <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][nombre]" value="<?php echo htmlspecialchars($prod['nombreProducto']); ?>">
@@ -752,9 +754,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (quantity > 0) {
                         total += subtotal;
                         itemsHtml += `<li class="summary-item">
-                                        <span>${productName} (${quantity}x)</span>
-                                        <span>S/. ${subtotal.toFixed(2)}</span>
-                                      </li>`;
+                                    <span>${productName} (${quantity}x)</span>
+                                    <span>S/. ${subtotal.toFixed(2)}</span>
+                                    </li>`;
                     }
                 });
 
@@ -769,7 +771,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const montoPagado = parseFloat(montoPagadoInput.value) || 0;
                 let cambio = montoPagado - total;
 
-                if (montoPagado >= total && total > 0) {
+                if (montoPagado >= total && total > 0 && clienteSelect.value !== '') {
                     cambioAmountSpan.textContent = `S/. ${cambio.toFixed(2)}`;
                     submitBtn.disabled = false;
                 } else {
@@ -806,8 +808,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             productsList.addEventListener('input', (event) => {
                 if (event.target.classList.contains('product-quantity')) {
+                    const quantity = parseInt(event.target.value);
+                    if (isNaN(quantity) || quantity < 1) {
+                        event.target.value = 1;
+                    }
                     updateTotal();
                 }
+            });
+            
+            clienteSelect.addEventListener('change', () => {
+                updatePaymentDetails();
             });
 
             montoPagadoInput.addEventListener('input', updatePaymentDetails);
@@ -833,16 +843,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return;
                 }
 
-                // Desactivar productos no seleccionados para que no se envíen
-                const unselectedItems = productsList.querySelectorAll('.product-item:not(.selected)');
-                unselectedItems.forEach(item => {
-                    const inputs = item.querySelectorAll('input[name^="productos"]');
-                    inputs.forEach(input => {
-                        input.disabled = true;
-                    });
-                });
-
-                // Ocultar el botón para evitar doble clic
+                // Desactivar el botón para evitar doble clic
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Procesando...';
 
