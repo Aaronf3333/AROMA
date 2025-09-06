@@ -100,16 +100,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Encabezado
         $pdf->SetFillColor(60,60,60);
         $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('Arial','B',11);
+        $pdf->SetFont('Arial','B',14); // Aumentado de 11 a 14
         $pdf->Rect(3, 5, $anchoEfectivo, 13, 'F');
         $pdf->SetXY(3, 6);
         $pdf->Cell($anchoEfectivo,7,encode_to_pdf('NOTA DE VENTA'),0,1,'C',false);
-        $pdf->SetFont('Arial','B',9);
+        $pdf->SetFont('Arial','B',11); // Aumentado de 9 a 11
         $pdf->SetX(3);
         $pdf->Cell($anchoEfectivo,6,'Aroma S.A.C',0,1,'C',false);
 
         $pdf->SetTextColor(0,0,0);
-        $pdf->SetFont('Arial','',8);
+        $pdf->SetFont('Arial','',10); // Aumentado de 8 a 10
         $pdf->Ln(3);
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('Cajero: '.$usuarioNombre),0,1,'C');
         $pdf->Ln(1);
@@ -134,10 +134,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cliente = mysqli_fetch_assoc($resultCliente);
         mysqli_stmt_close($stmtCliente);
 
-        $pdf->SetFont('Arial','B',8);
+        $pdf->SetFont('Arial','B',10); // Aumentado de 8 a 10
         $pdf->Cell($anchoEfectivo,5,'CLIENTE',0,1,'L');
         $pdf->Ln(1);
-        $pdf->SetFont('Arial','',7);
+        $pdf->SetFont('Arial','',9); // Aumentado de 7 a 9
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf($cliente['nombres'].' '.$cliente['apellidos']),0,1,'L');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf($cliente['tipoDocumento'].': '.$cliente['numeroDocumento']),0,1,'L');
@@ -158,13 +158,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $anchoSubtotal = 13;
 
         $pdf->SetFillColor(230,230,230);
-        $pdf->SetFont('Arial','B',7);
+        $pdf->SetFont('Arial','B',9); // Aumentado de 7 a 9
         $pdf->Cell($anchoProducto,6,'PRODUCTO',1,0,'C',true);
         $pdf->Cell($anchoCantidad,6,'CANT',1,0,'C',true);
         $pdf->Cell($anchoPrecio,6,'PRECIO',1,0,'C',true);
         $pdf->Cell($anchoSubtotal,6,'TOTAL',1,1,'C',true);
 
-        $pdf->SetFont('Arial','',7);
+        $pdf->SetFont('Arial','',9); // Aumentado de 7 a 9
         $pdf->SetFillColor(248,248,248);
         $alternar = false;
 
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(4);
 
         // TOTAL
-        $pdf->SetFont('Arial','B',9);
+        $pdf->SetFont('Arial','B',11); // Aumentado de 9 a 11
         $pdf->SetFillColor(60,60,60);
         $pdf->SetTextColor(255,255,255);
         $pdf->SetDrawColor(0,0,0);
@@ -196,12 +196,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Sección de pago
         $pdf->Ln(5);
-        $pdf->SetFont('Arial','B',8);
+        $pdf->SetFont('Arial','B',10); // Aumentado de 8 a 10
         $pdf->SetTextColor(0,0,0);
         $pdf->Cell($anchoEfectivo,5,encode_to_pdf('DETALLE DE PAGO'),0,1,'L');
         $pdf->Ln(1);
 
-        $pdf->SetFont('Arial','',8);
+        $pdf->SetFont('Arial','',10); // Aumentado de 8 a 10
         $pdf->Cell($anchoEfectivo/2,4,'Monto Pagado:',0,0,'L');
         $pdf->Cell($anchoEfectivo/2,4,'S/ '.number_format($montoPagado, 2),0,1,'R');
 
@@ -210,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Pie
         $pdf->Ln(6);
-        $pdf->SetFont('Arial','I',7);
+        $pdf->SetFont('Arial','I',9); // Aumentado de 7 a 9
         $pdf->SetTextColor(100,100,100);
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('¡Gracias por su compra!'),0,1,'C');
         $pdf->Ln(1);
@@ -218,7 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(3);
 
         // NOTA LEGAL
-        $pdf->SetFont('Arial','B',7);
+        $pdf->SetFont('Arial','B',9); // Aumentado de 7 a 9
         $pdf->SetTextColor(170,170,170);
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('Esta nota no tiene valor tributario.'),0,1,'C');
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('Solicite su Boleta de Venta o Factura.'),0,1,'C');
@@ -759,9 +759,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (quantity > 0) {
                         total += subtotal;
                         itemsHtml += `<li class="summary-item">
-                                    <span>${productName} (${quantity}x)</span>
-                                    <span>S/. ${subtotal.toFixed(2)}</span>
-                                    </li>`;
+                                        <span>${productName} (${quantity}x)</span>
+                                        <span>S/. ${subtotal.toFixed(2)}</span>
+                                        </li>`;
                     }
                 });
 
@@ -873,4 +873,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 </body>
 </html>
-
