@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('Cajero: '.$usuarioNombre),0,1,'C');
         $pdf->Ln(1);
         
-        $ruc = "10345678901";
+        $ruc = "10432255261";
         $numeroBoleta = 'BOL'.str_pad($idVenta,5,'0',STR_PAD_LEFT);
         $pdf->Cell($anchoEfectivo,4,'RUC: '.$ruc,0,1,'C');
         $pdf->Cell($anchoEfectivo,4,encode_to_pdf('Nro: '.$numeroBoleta),0,1,'C');
@@ -873,3 +873,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 </body>
 </html>
+
