@@ -55,19 +55,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
 // ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $idUsuario = intval($_POST['idUsuario']);
+    $nombres = $_POST['nombres'];
+    $apellidos = $_POST['apellidos'];
+    $tipoDocumento = $_POST['tipoDocumento'];
+    $numeroDocumento = $_POST['numeroDocumento'];
     $usuario = $_POST['usuario'];
     $contrasena = $_POST['contrasena'];
     $direccion = $_POST['direccion'];
     $telefono = $_POST['telefono'];
+    $idRol = intval($_POST['idRol']);
 
     $conn->begin_transaction();
 
     try {
-        $sqlUpdateUsuario = "UPDATE usuario SET usuario = ?, contrasena = ? WHERE idUsuario = ?";
+        // Actualizar usuario
+        $sqlUpdateUsuario = "UPDATE usuario SET usuario = ?, contrasena = ?, idRol = ? WHERE idUsuario = ?";
         $stmtUsuario = $conn->prepare($sqlUpdateUsuario);
-        $stmtUsuario->bind_param("ssi", $usuario, $contrasena, $idUsuario);
+        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idRol, $idUsuario);
         $stmtUsuario->execute();
 
+        // Obtener idPersona
         $sqlIdPersona = "SELECT idPersona FROM usuario WHERE idUsuario = ?";
         $stmtIdPersona = $conn->prepare($sqlIdPersona);
         $stmtIdPersona->bind_param("i", $idUsuario);
@@ -75,9 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
         $resultIdPersona = $stmtIdPersona->get_result();
         $idPersona = $resultIdPersona->fetch_assoc()['idPersona'];
 
-        $sqlUpdatePersona = "UPDATE persona SET direccion = ?, telefono = ? WHERE idPersona = ?";
+        // Actualizar persona
+        $sqlUpdatePersona = "UPDATE persona SET nombres = ?, apellidos = ?, tipoDocumento = ?, numeroDocumento = ?, direccion = ?, telefono = ? WHERE idPersona = ?";
         $stmtPersona = $conn->prepare($sqlUpdatePersona);
-        $stmtPersona->bind_param("ssi", $direccion, $telefono, $idPersona);
+        $stmtPersona->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono, $idPersona);
         $stmtPersona->execute();
 
         $conn->commit();
@@ -96,11 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
 // ------------------
 // OBTENER USUARIOS Y ROLES
 // ------------------
-$sqlUsuarios = "SELECT u.idUsuario, u.usuario, u.contrasena, r.nombreRol, p.nombres, p.apellidos, p.direccion, p.telefono
-                 FROM usuario u
-                 INNER JOIN rol r ON u.idRol = r.idRol
-                 INNER JOIN persona p ON u.idPersona = p.idPersona
-                 ORDER BY u.idUsuario ASC";
+$sqlUsuarios = "SELECT u.idUsuario, u.usuario, u.contrasena, u.idRol, r.nombreRol, 
+                       p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
+                       p.direccion, p.telefono, p.idPersona
+                FROM usuario u
+                INNER JOIN rol r ON u.idRol = r.idRol
+                INNER JOIN persona p ON u.idPersona = p.idPersona
+                ORDER BY u.idUsuario ASC";
 $resultUsuarios = $conn->query($sqlUsuarios);
 
 $sqlRoles = "SELECT idRol, nombreRol FROM rol ORDER BY idRol ASC";
@@ -199,10 +209,42 @@ body {
 .action-bar {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 2rem;
     flex-wrap: wrap;
     gap: 1rem;
+}
+
+.search-section {
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-section h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.search-section p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+#searchInput {
+    width: 100%;
+    max-width: 400px;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+#searchInput:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .btn {
@@ -233,6 +275,8 @@ body {
 .btn-success {
     background: linear-gradient(135deg, var(--success-color), #38a169);
     color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
 }
 
 .btn-success:hover {
@@ -240,18 +284,35 @@ body {
     box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
 
-/* New responsive table styles */
+.btn-warning {
+    background: linear-gradient(135deg, var(--warning-color), #d69e2e);
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+}
+
+.btn-warning:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(237, 137, 54, 0.4);
+}
+
+/* Responsive Table Styles */
 .responsive-table-container {
     background: white;
     border-radius: 16px;
-    overflow-x: auto; /* Enable horizontal scrolling */
+    overflow: hidden;
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     border: 1px solid var(--border-color);
+}
+
+.table-wrapper {
+    overflow-x: auto;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 800px;
 }
 
 thead {
@@ -267,6 +328,7 @@ th {
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
 td {
@@ -283,51 +345,38 @@ tbody tr:hover {
     background-color: #f8f9fa;
 }
 
-.form-group {
-    margin-bottom: 1.5rem;
+.user-info {
+    display: flex;
+    flex-direction: column;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
+.user-name {
     font-weight: 600;
     color: var(--text-primary);
+    margin-bottom: 2px;
 }
 
-input[type="text"], input[type="password"], select {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    background: white;
-}
-
-input[type="text"]:focus, input[type="password"]:focus, select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.password-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 12px;
-    cursor: pointer;
+.user-detail {
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    padding: 4px;
-    border-radius: 4px;
-    transition: color 0.2s ease;
 }
 
-.password-toggle:hover {
-    color: var(--primary-color);
+.badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    color: white;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+}
+
+.actions-cell {
+    white-space: nowrap;
 }
 
 /* Modal Styles */
@@ -360,7 +409,7 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     padding: 2rem;
     border-radius: 20px;
     width: 90%;
-    max-width: 500px;
+    max-width: 600px;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
@@ -407,6 +456,39 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     background: var(--error-color);
     color: white;
     transform: scale(1.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+input[type="text"], input[type="password"], select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+input[type="text"]:focus, input[type="password"]:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 /* Toast Notifications */
@@ -520,7 +602,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     animation: slideOutRight 0.3s ease;
 }
 
-/* Progress bar en toast */
 .toast-progress {
     position: absolute;
     bottom: 0;
@@ -543,93 +624,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     to { width: 0%; }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .container {
-        margin: 10px;
-        border-radius: 16px;
-    }
-    
-    .header-section {
-        padding: 1.5rem 1rem;
-    }
-    
-    .header-section h2 {
-        font-size: 2rem;
-    }
-    
-    .content-section {
-        padding: 1.5rem 1rem;
-    }
-    
-    .action-bar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .responsive-table-container {
-        overflow-x: auto;
-    }
-    
-    /* Hide table headers on mobile */
-    thead {
-        display: none;
-    }
-    
-    table, tbody, tr, td {
-        display: block;
-        width: 100%;
-    }
-    
-    tr {
-        margin-bottom: 1rem;
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid var(--border-color);
-        background: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
-    td {
-        text-align: right;
-        padding-left: 50%;
-        position: relative;
-        border-bottom: none;
-        border-top: 1px solid var(--border-color);
-    }
-    
-    td:first-child {
-        border-top: none;
-    }
-    
-    td::before {
-        content: attr(data-label);
-        position: absolute;
-        left: 0;
-        width: 45%;
-        padding-left: 1rem;
-        font-weight: 600;
-        text-align: left;
-        color: var(--text-secondary);
-    }
-    
-    /* Hide the password toggle on mobile to avoid layout issues */
-    .password-toggle {
-        display: none;
-    }
-
-    .modal-content {
-        margin: 20px;
-        width: calc(100% - 40px);
-    }
-    
-    .toast {
-        min-width: auto;
-        margin: 0 10px;
-    }
-}
-
-/* Loading Animation */
 .loading {
     display: inline-block;
     width: 20px;
@@ -644,20 +638,113 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     to { transform: rotate(360deg); }
 }
 
-/* Badge styles */
-.badge {
-    display: inline-block;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
-    color: white;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: baseline;
-    border-radius: 0.5rem;
-    background-color: #1a202c; 
-    color: white;
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .container {
+        margin: 10px;
+        border-radius: 16px;
+    }
+    
+    .content-section {
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-wrapper {
+        padding: 10px;
+    }
+    
+    .header-section {
+        padding: 1.5rem 1rem;
+    }
+    
+    .header-section h2 {
+        font-size: 2rem;
+    }
+    
+    .content-section {
+        padding: 1rem;
+    }
+    
+    .action-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-section {
+        min-width: auto;
+    }
+    
+    #searchInput {
+        max-width: none;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .responsive-table-container {
+        border-radius: 12px;
+    }
+    
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    table {
+        font-size: 0.85rem;
+    }
+    
+    th, td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .modal-content {
+        margin: 10px;
+        width: calc(100% - 20px);
+        padding: 1.5rem;
+        max-height: calc(100vh - 40px);
+    }
+    
+    .toast {
+        min-width: auto;
+        margin: 0 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-section h2 {
+        font-size: 1.75rem;
+    }
+    
+    table {
+        font-size: 0.8rem;
+    }
+    
+    th, td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .user-info {
+        font-size: 0.85rem;
+    }
+    
+    .actions-cell {
+        min-width: 100px;
+    }
+    
+    .btn {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        gap: 4px;
+    }
 }
 </style>
 </head>
@@ -673,84 +760,74 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
 
         <div class="content-section">
             <div class="action-bar">
-                <div>
+                <div class="search-section">
                     <h3>Lista de Usuarios</h3>
-                    <p class="text-secondary">Gestiona y edita los usuarios existentes</p>
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre, correo, dirección..." style="margin-top: 10px; padding: 8px 12px; border: 2px solid var(--border-color); border-radius: 8px; font-size: 0.9rem; width: 250px;">
+                    <p>Gestiona y edita los usuarios existentes</p>
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre, correo, dirección...">
                 </div>
-                <button class="btn btn-primary" onclick="abrirModal()">
+                <button class="btn btn-primary" onclick="abrirModal('nuevo')">
                     <i class="fas fa-user-plus"></i> Agregar Usuario
                 </button>
             </div>
 
             <div class="responsive-table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th><i class="fas fa-hashtag"></i> ID</th>
-                            <th><i class="fas fa-user"></i> Nombre Completo</th>
-                            <th><i class="fas fa-envelope"></i> Correo</th>
-                            <th><i class="fas fa-lock"></i> Contraseña</th>
-                            <th><i class="fas fa-map-marker-alt"></i> Dirección</th>
-                            <th><i class="fas fa-phone"></i> Teléfono</th>
-                            <th><i class="fas fa-user-tag"></i> Rol</th>
-                            <th><i class="fas fa-cogs"></i> Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="userTableBody">
-                        <?php 
-                        if ($resultUsuarios && $resultUsuarios->num_rows > 0) {
-                            while($row = $resultUsuarios->fetch_assoc()): ?>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
                             <tr>
-                                <form method="POST" onsubmit="showLoading(this)">
-                                    <td data-label="ID">
-                                        <strong><?php echo $row['idUsuario']; ?></strong>
-                                        <input type="hidden" name="idUsuario" value="<?php echo $row['idUsuario']; ?>">
-                                    </td>
-                                    <td data-label="Nombre Completo">
+                                <th><i class="fas fa-hashtag"></i> ID</th>
+                                <th><i class="fas fa-user"></i> Usuario</th>
+                                <th><i class="fas fa-id-card"></i> Documento</th>
+                                <th><i class="fas fa-map-marker-alt"></i> Dirección</th>
+                                <th><i class="fas fa-phone"></i> Teléfono</th>
+                                <th><i class="fas fa-user-tag"></i> Rol</th>
+                                <th><i class="fas fa-cogs"></i> Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <?php 
+                            if ($resultUsuarios && $resultUsuarios->num_rows > 0) {
+                                while($row = $resultUsuarios->fetch_assoc()): ?>
+                                <tr>
+                                    <td><strong><?php echo $row['idUsuario']; ?></strong></td>
+                                    <td>
                                         <div class="user-info">
-                                            <strong><?php echo htmlspecialchars($row['nombres'].' '.$row['apellidos']); ?></strong>
+                                            <div class="user-name"><?php echo htmlspecialchars($row['nombres'].' '.$row['apellidos']); ?></div>
+                                            <div class="user-detail"><?php echo htmlspecialchars($row['usuario']); ?></div>
                                         </div>
                                     </td>
-                                    <td data-label="Correo">
-                                        <input type="text" name="usuario" value="<?php echo htmlspecialchars($row['usuario']); ?>" required>
-                                    </td>
-                                    <td data-label="Contraseña">
-                                        <div class="password-container">
-                                            <input type="password" name="contrasena" value="<?php echo htmlspecialchars($row['contrasena']); ?>" 
-                                                   class="pass-input-<?php echo $row['idUsuario']; ?>" required>
-                                            <i class="fas fa-eye password-toggle" onclick="togglePass(<?php echo $row['idUsuario']; ?>)"></i>
+                                    <td>
+                                        <div class="user-info">
+                                            <div class="user-name"><?php echo htmlspecialchars($row['tipoDocumento']); ?></div>
+                                            <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento']); ?></div>
                                         </div>
                                     </td>
-                                    <td data-label="Dirección">
-                                        <input type="text" name="direccion" value="<?php echo htmlspecialchars($row['direccion']); ?>">
-                                    </td>
-                                    <td data-label="Teléfono">
-                                        <input type="text" name="telefono" value="<?php echo htmlspecialchars($row['telefono']); ?>">
-                                    </td>
-                                    <td data-label="Rol">
+                                    <td><?php echo htmlspecialchars($row['direccion']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['telefono']); ?></td>
+                                    <td>
                                         <span class="badge">
-                                            <?php echo $row['nombreRol']; ?>
+                                            <?php echo htmlspecialchars($row['nombreRol']); ?>
                                         </span>
                                     </td>
-                                    <td data-label="Acciones">
-                                        <button type="submit" name="editar" class="btn btn-success">
-                                            <i class="fas fa-save"></i> Guardar
+                                    <td class="actions-cell">
+                                        <button class="btn btn-warning" onclick="abrirModalEditar(<?php echo htmlspecialchars(json_encode($row)); ?>)">
+                                            <i class="fas fa-edit"></i> Editar
                                         </button>
                                     </td>
-                                </form>
-                            </tr>
-                            <?php endwhile; 
-                        } else {
-                            echo "<tr><td colspan='8' style='text-align: center;'>No se encontraron usuarios.</td></tr>";
-                        }
-                        ?>
-                    </tbody>
-                </table>
+                                </tr>
+                                <?php endwhile; 
+                            } else {
+                                echo "<tr><td colspan='7' style='text-align: center; padding: 2rem;'>No se encontraron usuarios.</td></tr>";
+                            }
+                            ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Modal Nuevo Usuario -->
     <div class="modal" id="modalNuevo">
         <div class="modal-content">
             <div class="modal-header">
@@ -762,28 +839,32 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
             <form method="POST" onsubmit="showLoadingModal(this)">
                 <input type="hidden" name="nuevo" value="1">
                 
-                <div class="form-group">
-                    <label><i class="fas fa-user"></i> Nombres</label>
-                    <input type="text" name="nombres" required placeholder="Ingrese los nombres">
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-user"></i> Apellidos</label>
-                    <input type="text" name="apellidos" required placeholder="Ingrese los apellidos">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Nombres</label>
+                        <input type="text" name="nombres" required placeholder="Ingrese los nombres">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Apellidos</label>
+                        <input type="text" name="apellidos" required placeholder="Ingrese los apellidos">
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                    <select name="tipoDocumento" required>
-                        <option value="">Seleccionar tipo</option>
-                        <option value="DNI">DNI</option>
-                        <option value="CE">Carnet de Extranjería</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                    <input type="text" name="numeroDocumento" required placeholder="Ingrese el número">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
+                        <select name="tipoDocumento" required>
+                            <option value="">Seleccionar tipo</option>
+                            <option value="DNI">DNI</option>
+                            <option value="CE">Carnet de Extranjería</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
+                        <input type="text" name="numeroDocumento" required placeholder="Ingrese el número">
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -796,14 +877,16 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                     <input type="text" name="telefono" required placeholder="Ingrese el número de teléfono">
                 </div>
                 
-                <div class="form-group">
-                    <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
-                    <input type="text" name="usuario" required placeholder="ejemplo@correo.com">
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-lock"></i> Contraseña</label>
-                    <input type="password" name="contrasena" required placeholder="Ingrese una contraseña segura">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                        <input type="text" name="usuario" required placeholder="ejemplo@correo.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-lock"></i> Contraseña</label>
+                        <input type="password" name="contrasena" required placeholder="Ingrese una contraseña segura">
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -823,12 +906,95 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         </div>
     </div>
 
+    <!-- Modal Editar Usuario -->
+    <div class="modal" id="modalEditar">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Usuario</h3>
+                <button class="close" onclick="cerrarModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form method="POST" onsubmit="showLoadingModal(this)">
+                <input type="hidden" name="editar" value="1">
+                <input type="hidden" name="idUsuario" id="edit_idUsuario">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Nombres</label>
+                        <input type="text" name="nombres" id="edit_nombres" required placeholder="Ingrese los nombres">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Apellidos</label>
+                        <input type="text" name="apellidos" id="edit_apellidos" required placeholder="Ingrese los apellidos">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
+                        <select name="tipoDocumento" id="edit_tipoDocumento" required>
+                            <option value="">Seleccionar tipo</option>
+                            <option value="DNI">DNI</option>
+                            <option value="CE">Carnet de Extranjería</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
+                        <input type="text" name="numeroDocumento" id="edit_numeroDocumento" required placeholder="Ingrese el número">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Dirección</label>
+                    <input type="text" name="direccion" id="edit_direccion" required placeholder="Ingrese la dirección">
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-phone"></i> Teléfono</label>
+                    <input type="text" name="telefono" id="edit_telefono" required placeholder="Ingrese el número de teléfono">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                        <input type="text" name="usuario" id="edit_usuario" required placeholder="ejemplo@correo.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-lock"></i> Contraseña</label>
+                        <input type="password" name="contrasena" id="edit_contrasena" required placeholder="Ingrese una contraseña segura">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-user-tag"></i> Rol</label>
+                    <select name="idRol" id="edit_idRol" required>
+                        <option value="">Seleccionar rol</option>
+                        <?php foreach($roles as $rol): ?>
+                            <option value="<?php echo $rol['idRol']; ?>"><?php echo $rol['nombreRol']; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    <i class="fas fa-save"></i> Actualizar Usuario
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <?php include(__DIR__ . "/includes/footer.php"); ?>
 </div>
 
 <script>
+// Variables globales para modales
+let currentModal = null;
+
 // Función para mostrar toast notifications
 function showToast(message, type = 'success', duration = 5000) {
     const toastContainer = document.getElementById('toastContainer');
@@ -879,31 +1045,44 @@ function hideToast(button) {
     }, 300);
 }
 
-// Función para toggle password visibility
-function togglePass(id) {
-    const input = document.querySelector('.pass-input-' + id);
-    const icon = input.nextElementSibling;
-    
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
+// Funciones para modales
+function abrirModal(tipo) {
+    if (tipo === 'nuevo') {
+        currentModal = document.getElementById('modalNuevo');
+        currentModal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+
+        // Enfocar el primer campo
+        setTimeout(() => {
+            const firstInput = currentModal.querySelector('input[name="nombres"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 200);
     }
 }
 
-// Funciones para modal
-function abrirModal() {
-    const modal = document.getElementById('modalNuevo');
-    modal.classList.add('show');
+function abrirModalEditar(userData) {
+    currentModal = document.getElementById('modalEditar');
+    
+    // Llenar los campos del modal con los datos del usuario
+    document.getElementById('edit_idUsuario').value = userData.idUsuario;
+    document.getElementById('edit_nombres').value = userData.nombres;
+    document.getElementById('edit_apellidos').value = userData.apellidos;
+    document.getElementById('edit_tipoDocumento').value = userData.tipoDocumento;
+    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento;
+    document.getElementById('edit_direccion').value = userData.direccion;
+    document.getElementById('edit_telefono').value = userData.telefono;
+    document.getElementById('edit_usuario').value = userData.usuario;
+    document.getElementById('edit_contrasena').value = userData.contrasena;
+    document.getElementById('edit_idRol').value = userData.idRol;
+    
+    currentModal.classList.add('show');
     document.body.style.overflow = 'hidden';
 
-    // Se agrega un pequeño retraso para asegurar que el modal esté visible antes de enfocar
+    // Enfocar el primer campo
     setTimeout(() => {
-        const firstInput = modal.querySelector('input[name="nombres"]');
+        const firstInput = currentModal.querySelector('input[name="nombres"]');
         if (firstInput) {
             firstInput.focus();
         }
@@ -911,18 +1090,28 @@ function abrirModal() {
 }
 
 function cerrarModal() {
-    const modal = document.getElementById('modalNuevo');
-    modal.classList.remove('show');
-    document.body.style.overflow = 'auto';
-    // Reset form
-    const form = modal.querySelector('form');
-    form.reset();
+    if (currentModal) {
+        currentModal.classList.remove('show');
+        document.body.style.overflow = 'auto';
+        
+        // Reset form
+        const form = currentModal.querySelector('form');
+        if (form) {
+            form.reset();
+        }
+        
+        currentModal = null;
+    }
 }
 
 // Cerrar modal al hacer clic fuera
 window.onclick = function(event) {
-    const modal = document.getElementById('modalNuevo');
-    if (event.target === modal) {
+    const modalNuevo = document.getElementById('modalNuevo');
+    const modalEditar = document.getElementById('modalEditar');
+    
+    if (event.target === modalNuevo) {
+        cerrarModal();
+    } else if (event.target === modalEditar) {
         cerrarModal();
     }
 }
@@ -935,22 +1124,16 @@ document.addEventListener('keydown', function(event) {
 });
 
 // Función para mostrar loading en botones
-function showLoading(form) {
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<span class="loading"></span> Guardando...';
-    submitBtn.disabled = true;
-    
-    setTimeout(() => {
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }, 2000);
-}
-
 function showLoadingModal(form) {
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<span class="loading"></span> Creando...';
+    
+    if (originalText.includes('Crear')) {
+        submitBtn.innerHTML = '<span class="loading"></span> Creando...';
+    } else {
+        submitBtn.innerHTML = '<span class="loading"></span> Actualizando...';
+    }
+    
     submitBtn.disabled = true;
 }
 
@@ -961,20 +1144,6 @@ showToast('<?php echo addslashes($_SESSION['toast_message']); ?>', '<?php echo $
 unset($_SESSION['toast_message']);
 unset($_SESSION['toast_type']);
 endif; ?>
-
-// Smooth scroll para elementos
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
-    });
-});
 
 // Validación mejorada para formularios
 document.querySelectorAll('form').forEach(form => {
@@ -995,6 +1164,7 @@ document.querySelectorAll('form').forEach(form => {
         
         if (!isValid) {
             e.preventDefault();
+            showToast('Por favor complete todos los campos requeridos', 'error');
         }
     });
 });
@@ -1010,8 +1180,8 @@ searchInput.addEventListener('keyup', function(event) {
         const cells = row.getElementsByTagName('td');
         let found = false;
         
-        // Iterar a través de las celdas de la fila (excepto la de acciones y la de contraseña)
-        for (let j = 0; j < cells.length - 2; j++) {
+        // Buscar en todas las celdas excepto la de acciones (última columna)
+        for (let j = 0; j < cells.length - 1; j++) {
             const cellText = cells[j].textContent || cells[j].innerText;
             if (cellText.toLowerCase().indexOf(filter) > -1) {
                 found = true;
@@ -1025,6 +1195,92 @@ searchInput.addEventListener('keyup', function(event) {
             row.style.display = "none";
         }
     }
+});
+
+// Smooth scroll para elementos
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+
+// Mejorar la experiencia táctil en dispositivos móviles
+if ('ontouchstart' in window) {
+    document.body.classList.add('touch-device');
+    
+    // Agregar efecto de hover para dispositivos táctiles
+    document.querySelectorAll('.btn').forEach(btn => {
+        btn.addEventListener('touchstart', function() {
+            this.style.transform = 'translateY(-1px)';
+        });
+        
+        btn.addEventListener('touchend', function() {
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 150);
+        });
+    });
+}
+
+// Optimización para scroll horizontal en tablas móviles
+const tableWrapper = document.querySelector('.table-wrapper');
+if (tableWrapper) {
+    let isScrolling = false;
+    
+    tableWrapper.addEventListener('scroll', function() {
+        if (!isScrolling) {
+            isScrolling = true;
+            this.style.scrollBehavior = 'smooth';
+            
+            setTimeout(() => {
+                isScrolling = false;
+            }, 150);
+        }
+    });
+}
+
+// Validación adicional para campos específicos
+document.addEventListener('DOMContentLoaded', function() {
+    // Validación de email
+    const emailInputs = document.querySelectorAll('input[name="usuario"]');
+    emailInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            const email = this.value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (email && !emailRegex.test(email)) {
+                this.style.borderColor = 'var(--warning-color)';
+                showToast('Por favor ingrese un formato de email válido', 'warning', 3000);
+            } else {
+                this.style.borderColor = 'var(--border-color)';
+            }
+        });
+    });
+    
+    // Validación de documento
+    const docInputs = document.querySelectorAll('input[name="numeroDocumento"]');
+    docInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            // Solo permitir números
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    });
+    
+    // Validación de teléfono
+    const phoneInputs = document.querySelectorAll('input[name="telefono"]');
+    phoneInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            // Solo permitir números y algunos caracteres especiales
+            this.value = this.value.replace(/[^0-9+\-\s()]/g, '');
+        });
+    });
 });
 </script>
 </body>
