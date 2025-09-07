@@ -21,17 +21,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
 
-    // --- MODIFICATION STARTS HERE ---
-    // Check if the document type is "indocumentado"
-    if ($tipoDocumento === 'indocumentado') {
-        // If it is, the document number is optional, so we set it to an empty string.
-        $numeroDocumento = '';
+    // --- Lógica adaptada del archivo de usuarios ---
+    if ($tipoDocumento === 'IND') {
+        $tipoDocumentoParaBD = 'indocumentado'; 
+        $numeroDocumento = ''; 
     } else {
-        // Otherwise, we get the number from the form.
-        // We use isset() to prevent the 'Undefined array key' warning.
+        $tipoDocumentoParaBD = $tipoDocumento; 
         $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
     }
-    // --- MODIFICATION ENDS HERE ---
+    // --- Fin de la lógica adaptada ---
 
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
@@ -43,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         // Verificar si la persona ya existe en la tabla `Persona`
         $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
         $stmtCheck = $conn->prepare($checkSql);
-        $stmtCheck->bind_param("ss", $tipoDocumento, $numeroDocumento);
+        $stmtCheck->bind_param("ss", $tipoDocumentoParaBD, $numeroDocumento);
         $stmtCheck->execute();
         $resultCheck = $stmtCheck->get_result();
         $rowCheck = $resultCheck->fetch_assoc();
@@ -76,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
                            VALUES (?, ?, ?, ?, ?, ?)";
             $stmtPersona = $conn->prepare($sqlPersona);
-            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
+            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
             $stmtPersona->execute();
 
             // Obtener el ID de la persona recién insertada (MySQL)
@@ -581,7 +579,6 @@ $conn->close();
                 gap: 5px; /* Mantener la compacidad en móviles */
             }
         }
-
     </style>
 </head>
 <body>
@@ -618,12 +615,12 @@ $conn->close();
                             <option value="">Seleccione tipo de documento</option>
                             <option value="DNI">DNI</option>
                             <option value="CE">CE</option>
-                            <option value="indocumentado">Indocumentado</option>
-                            </select>
+                            <option value="IND">Indocumentado</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <input type="text" name="numeroDocumento" placeholder="Número de documento" class="form-input">
-                        </div>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
