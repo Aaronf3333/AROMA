@@ -1,6 +1,5 @@
 <?php
 session_start();
-// Asegúrate de que tu archivo de conexión esté configurado para UTF-8.
 include(__DIR__ . "/conexion.php");
 require(__DIR__ . "/fpdf/fpdf.php");
 
@@ -376,8 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .form-group {
             margin-bottom: 20px;
-            width: 100%; /* Para que los inputs ocupen todo el ancho */
-            max-width: 400px; /* Limita el ancho para centrarlo mejor */
+            width: 100%;
         }
         .form-label {
             display: block;
@@ -651,7 +649,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form method="POST" id="formBoleta">
                 <div class="form-section">
                     <h3 class="section-title"><i class="fas fa-user-tag"></i> Seleccionar Cliente</h3>
-                    <div class="form-group dropdown-container">
+                    <div class="form-group dropdown-container" style="max-width: 400px;">
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
                         <input type="text" id="clienteSearch" class="form-input dropdown-input" placeholder="Nombre o DNI del cliente" readonly>
                         <ul id="clienteList" class="dropdown-list">
