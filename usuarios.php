@@ -11,28 +11,39 @@ if (!isset($_SESSION['idUsuario'])) {
 // PROCESAR NUEVO USUARIO
 // ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
-    $nombres = $_POST['nombres'];
-    $apellidos = $_POST['apellidos'];
+    $nombres = trim($_POST['nombres']);
+    $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
-    $direccion = $_POST['direccion'];
-    $telefono = $_POST['telefono'];
-    $usuario = $_POST['usuario'];
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
+    $direccion = trim($_POST['direccion']);
+    $telefono = trim($_POST['telefono']);
+    $usuario = trim($_POST['usuario']);
     $contrasena = $_POST['contrasena'];
     $idRol = intval($_POST['idRol']);
 
+    // Validación en el servidor
+    if (empty($nombres) || empty($apellidos) || empty($tipoDocumento) || empty($direccion) || empty($telefono) || empty($usuario) || empty($contrasena) || empty($idRol)) {
+        $_SESSION['toast_message'] = "Por favor, complete todos los campos requeridos.";
+        $_SESSION['toast_type'] = 'error';
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+    
     // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
     if ($tipoDocumento === 'IND') {
-        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
-        $numeroDocumento = ''; // Asegurar que el numero de documento esté vacío si es indocumentado
+        $tipoDocumentoParaBD = 'indocumentado';
+        $numeroDocumento = '';
     } else {
-        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
+        $tipoDocumentoParaBD = $tipoDocumento;
     }
+
+    // Hashear la contraseña antes de guardarla
+    $contrasena_hash = password_hash($contrasena, PASSWORD_DEFAULT);
 
     $conn->begin_transaction();
 
     try {
-        $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono) 
+        $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
                        VALUES (?, ?, ?, ?, ?, ?)";
         $stmtPersona = $conn->prepare($sqlPersona);
         $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
@@ -42,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
 
         $sqlUsuario = "INSERT INTO usuario (usuario, contrasena, idPersona, idRol) VALUES (?, ?, ?, ?)";
         $stmtUsuario = $conn->prepare($sqlUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idPersona, $idRol);
+        $stmtUsuario->bind_param("ssii", $usuario, $contrasena_hash, $idPersona, $idRol);
         $stmtUsuario->execute();
 
         $conn->commit();
@@ -63,23 +74,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
 // ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $idUsuario = intval($_POST['idUsuario']);
-    $nombres = $_POST['nombres'];
-    $apellidos = $_POST['apellidos'];
+    $nombres = trim($_POST['nombres']);
+    $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
-    $usuario = $_POST['usuario'];
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
+    $usuario = trim($_POST['usuario']);
     $contrasena = $_POST['contrasena'];
-    $direccion = $_POST['direccion'];
-    $telefono = $_POST['telefono'];
+    $direccion = trim($_POST['direccion']);
+    $telefono = trim($_POST['telefono']);
     $idRol = intval($_POST['idRol']);
+
+    // Validación en el servidor
+    if (empty($nombres) || empty($apellidos) || empty($tipoDocumento) || empty($direccion) || empty($telefono) || empty($usuario) || empty($contrasena) || empty($idRol)) {
+        $_SESSION['toast_message'] = "Por favor, complete todos los campos requeridos.";
+        $_SESSION['toast_type'] = 'error';
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
 
     // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
     if ($tipoDocumento === 'IND') {
-        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
-        $numeroDocumento = ''; // Asegurar que el numero de documento esté vacío si es indocumentado
+        $tipoDocumentoParaBD = 'indocumentado';
+        $numeroDocumento = '';
     } else {
-        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
+        $tipoDocumentoParaBD = $tipoDocumento;
     }
+
+    // Hashear la contraseña antes de guardarla
+    $contrasena_hash = password_hash($contrasena, PASSWORD_DEFAULT);
 
     $conn->begin_transaction();
 
@@ -87,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
         // Actualizar usuario
         $sqlUpdateUsuario = "UPDATE usuario SET usuario = ?, contrasena = ?, idRol = ? WHERE idUsuario = ?";
         $stmtUsuario = $conn->prepare($sqlUpdateUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idRol, $idUsuario);
+        $stmtUsuario->bind_param("ssii", $usuario, $contrasena_hash, $idRol, $idUsuario);
         $stmtUsuario->execute();
 
         // Obtener idPersona
@@ -811,7 +833,7 @@ input:disabled {
                             if ($resultUsuarios && $resultUsuarios->num_rows > 0) {
                                 while($row = $resultUsuarios->fetch_assoc()): ?>
                                 <tr>
-                                    <td><strong><?php echo $row['idUsuario']; ?></strong></td>
+                                    <td><strong><?php echo htmlspecialchars($row['idUsuario']); ?></strong></td>
                                     <td>
                                         <div class="user-info">
                                             <div class="user-name"><?php echo htmlspecialchars($row['nombres'].' '.$row['apellidos']); ?></div>
@@ -822,7 +844,6 @@ input:disabled {
                                         <div class="user-info">
                                             <div class="user-name">
                                                 <?php
-                                                // Mostrar "Indocumentado" si el valor en BD es 'indocumentado'
                                                 if ($row['tipoDocumento'] === 'indocumentado') {
                                                     echo 'Indocumentado';
                                                 } else {
@@ -841,7 +862,7 @@ input:disabled {
                                         </span>
                                     </td>
                                     <td class="actions-cell">
-                                        <button class="btn btn-warning" onclick="abrirModalEditar(<?php echo htmlspecialchars(json_encode($row)); ?>)">
+                                        <button class="btn btn-warning" onclick="abrirModalEditar(this)" data-user='<?php echo htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>'>
                                             <i class="fas fa-edit"></i> Editar
                                         </button>
                                     </td>
@@ -925,7 +946,7 @@ input:disabled {
                     <select name="idRol" required>
                         <option value="">Seleccionar rol</option>
                         <?php foreach($roles as $rol): ?>
-                            <option value="<?php echo $rol['idRol']; ?>"><?php echo $rol['nombreRol']; ?></option>
+                            <option value="<?php echo htmlspecialchars($rol['idRol']); ?>"><?php echo htmlspecialchars($rol['nombreRol']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -1005,7 +1026,7 @@ input:disabled {
                     <select name="idRol" id="edit_idRol" required>
                         <option value="">Seleccionar rol</option>
                         <?php foreach($roles as $rol): ?>
-                            <option value="<?php echo $rol['idRol']; ?>"><?php echo $rol['nombreRol']; ?></option>
+                            <option value="<?php echo htmlspecialchars($rol['idRol']); ?>"><?php echo htmlspecialchars($rol['nombreRol']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -1108,7 +1129,8 @@ function abrirModal(tipo) {
     }
 }
 
-function abrirModalEditar(userData) {
+function abrirModalEditar(button) {
+    const userData = JSON.parse(button.getAttribute('data-user'));
     currentModal = document.getElementById('modalEditar');
     
     // Llenar los campos del modal con los datos del usuario
@@ -1233,6 +1255,9 @@ document.querySelectorAll('form').forEach(form => {
         let isValid = true;
         
         requiredFields.forEach(field => {
+            // No validar campos deshabilitados
+            if (field.disabled) return; 
+
             if (!field.value.trim()) {
                 field.style.borderColor = 'var(--error-color)';
                 field.style.boxShadow = '0 0 0 3px rgba(245, 101, 101, 0.1)';
@@ -1341,6 +1366,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showToast('Por favor ingrese un formato de email válido', 'warning', 3000);
             } else {
                 this.style.borderColor = 'var(--border-color)';
+                this.style.boxShadow = 'none';
             }
         });
     });
