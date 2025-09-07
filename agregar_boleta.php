@@ -133,12 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, 'Fecha: ' . $fechaEmision, 0, 1, 'C');
         $pdf->Ln(5);
 
-        // Info cliente (LÓGICA MODIFICADA AQUÍ)
-        if ($idCliente == 0) {
-            $clienteNombre = "Cliente Genérico";
-            $clienteTipoDoc = "DNI";
-            $clienteNumeroDoc = "-----";
-        } else {
+        // Info cliente (LÓGICA CORREGIDA AQUÍ)
+        $clienteNombre = "Cliente Genérico";
+        $clienteTipoDoc = "DNI";
+        $clienteNumeroDoc = "-----";
+        $clienteDireccion = "";
+        $clienteTelefono = "";
+
+        if ($idCliente > 0) {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
             mysqli_stmt_bind_param($stmtCliente, "i", $idCliente);
@@ -146,11 +148,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resultCliente = mysqli_stmt_get_result($stmtCliente);
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
-            $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-            $clienteTipoDoc = htmlspecialchars($cliente['tipoDocumento'] ?? 'DNI');
-            $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
-            if (empty($clienteNumeroDoc)) {
-                $clienteNumeroDoc = '-----';
+
+            if ($cliente) {
+                $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
+                $clienteTipoDoc = !empty($cliente['tipoDocumento']) ? $cliente['tipoDocumento'] : 'DNI';
+                $clienteNumeroDoc = !empty($cliente['numeroDocumento']) ? htmlspecialchars($cliente['numeroDocumento']) : '-----';
+                $clienteDireccion = $cliente['direccion'] ?? '';
+                $clienteTelefono = $cliente['telefono'] ?? '';
             }
         }
         
@@ -161,13 +165,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, $clienteTipoDoc . ': ' . $clienteNumeroDoc, 0, 1, 'L');
-        if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
+        if (!empty($clienteDireccion)) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . htmlspecialchars($clienteDireccion), 0, 1, 'L');
         }
-        if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
+        if (!empty($clienteTelefono)) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . $cliente['telefono'], 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . htmlspecialchars($clienteTelefono), 0, 1, 'L');
         }
         $pdf->Ln(5);
 
