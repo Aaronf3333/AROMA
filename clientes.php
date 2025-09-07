@@ -28,63 +28,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $conn->begin_transaction();
 
     try {
-        // Verificar si la persona ya existe en la tabla `Persona`
-        // Se excluye la validación de documento si el tipo es 'indocumentado'
-        $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
-        $stmtCheck = $conn->prepare($checkSql);
-        $stmtCheck->bind_param("ss", $tipoDocumento, $numeroDocumento);
-        $stmtCheck->execute();
-        $resultCheck = $stmtCheck->get_result();
-        $rowCheck = $resultCheck->fetch_assoc();
+        // 1. Lógica para verificar y registrar la persona
+        $idPersona = null;
+        if ($tipoDocumento !== 'indocumentado') {
+            // Verificar si la persona con el mismo tipo y número de documento ya existe
+            $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
+            $stmtCheck = $conn->prepare($checkSql);
+            $stmtCheck->bind_param("ss", $tipoDocumento, $numeroDocumento);
+            $stmtCheck->execute();
+            $resultCheck = $stmtCheck->get_result();
+            $rowCheck = $resultCheck->fetch_assoc();
 
-        if ($rowCheck) {
-            $idPersona = $rowCheck['idPersona'];
-
-            // Si la persona existe, verificar si ya es un cliente
-            $checkClienteSql = "SELECT idCliente FROM cliente WHERE idPersona = ?";
-            $stmtCheckCliente = $conn->prepare($checkClienteSql);
-            $stmtCheckCliente->bind_param("i", $idPersona);
-            $stmtCheckCliente->execute();
-            $resultCheckCliente = $stmtCheckCliente->get_result();
-            $rowCheckCliente = $resultCheckCliente->fetch_assoc();
-
-            if ($rowCheckCliente) {
-                $_SESSION['mensaje'] = "Este cliente ya está registrado.";
-                $_SESSION['tipo'] = "warning";
-            } else {
-                // Agregar la persona existente como cliente
-                $sqlCliente = "INSERT INTO cliente (idPersona) VALUES (?)";
-                $stmtCliente = $conn->prepare($sqlCliente);
-                $stmtCliente->bind_param("i", $idPersona);
-                $stmtCliente->execute();
-                $_SESSION['mensaje'] = "Cliente existente agregado correctamente.";
-                $_SESSION['tipo'] = "info";
+            if ($rowCheck) {
+                $idPersona = $rowCheck['idPersona'];
             }
-        } else {
-            // Si la persona no existe, insertarla primero en la tabla `Persona`
+        }
+
+        // Si la persona no existe, la insertamos
+        if ($idPersona === null) {
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
                             VALUES (?, ?, ?, ?, ?, ?)";
             $stmtPersona = $conn->prepare($sqlPersona);
             $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
             $stmtPersona->execute();
-
-            // Obtener el ID de la persona recién insertada (MySQL)
             $idPersona = $conn->insert_id;
+            $_SESSION['mensaje'] = "Cliente y persona agregados correctamente.";
+            $_SESSION['tipo'] = "success";
+        }
 
-            // Insertar el nuevo cliente usando el ID de la persona
+        // 2. Lógica para verificar si la persona ya es un cliente
+        $checkClienteSql = "SELECT idCliente FROM cliente WHERE idPersona = ?";
+        $stmtCheckCliente = $conn->prepare($checkClienteSql);
+        $stmtCheckCliente->bind_param("i", $idPersona);
+        $stmtCheckCliente->execute();
+        $resultCheckCliente = $stmtCheckCliente->get_result();
+        $rowCheckCliente = $resultCheckCliente->fetch_assoc();
+
+        if ($rowCheckCliente) {
+            // Si la persona ya existe como cliente, mostramos una advertencia
+            $_SESSION['mensaje'] = "Esta persona ya está registrada como cliente.";
+            $_SESSION['tipo'] = "warning";
+            
+            // Si la persona ya existe, no es necesario hacer un rollback o commit
+            // En este caso, solo salimos de la transacción sin hacer nada
+            $conn->commit();
+            header("Location: clientes.php");
+            exit();
+        } else {
+            // Si la persona no es cliente, la insertamos
             $sqlCliente = "INSERT INTO cliente (idPersona) VALUES (?)";
             $stmtCliente = $conn->prepare($sqlCliente);
             $stmtCliente->bind_param("i", $idPersona);
             $stmtCliente->execute();
+
+            // Si llegamos aquí, la inserción fue exitosa (ya sea nueva persona o persona existente)
             $_SESSION['mensaje'] = "Cliente agregado correctamente.";
             $_SESSION['tipo'] = "success";
         }
 
+
         $conn->commit();
     } catch (mysqli_sql_exception $e) {
         $conn->rollback();
-        $_SESSION['mensaje'] = "Error al procesar la solicitud: " . $e->getMessage();
-        $_SESSION['tipo'] = "error";
+        // Si hay una violación de la restricción UNIQUE de persona, significa que el documento ya existe.
+        if (strpos($e->getMessage(), 'UQ_Persona_Documento') !== false) {
+             $_SESSION['mensaje'] = "Error: Ya existe un registro con el mismo tipo y número de documento.";
+             $_SESSION['tipo'] = "error";
+        } else {
+             $_SESSION['mensaje'] = "Error al procesar la solicitud: " . $e->getMessage();
+             $_SESSION['tipo'] = "error";
+        }
     }
 
     header("Location: clientes.php");
@@ -734,19 +747,20 @@ $conn->close();
             const tipoDocumentoSelect = document.getElementById('tipoDocumento');
             const numeroDocumentoInput = document.getElementById('numeroDocumento');
 
-            // Lógica para que el número de documento sea opcional si es "indocumentado"
+            // Lógica para que el número de documento sea opcional y deshabilitado si es "indocumentado"
             tipoDocumentoSelect.addEventListener('change', function() {
                 if (this.value === 'indocumentado') {
                     numeroDocumentoInput.required = false;
-                    numeroDocumentoInput.placeholder = "Número de documento (Opcional)";
+                    numeroDocumentoInput.disabled = true;
+                    numeroDocumentoInput.placeholder = "No requerido";
                     numeroDocumentoInput.value = '';
                 } else {
                     numeroDocumentoInput.required = true;
+                    numeroDocumentoInput.disabled = false;
                     numeroDocumentoInput.placeholder = "Número de documento";
                 }
             });
             
-
             let allRows = Array.from(tableBody.querySelectorAll('tr'));
             const totalRows = allRows.length;
 
