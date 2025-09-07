@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
             $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-            $clienteDoc = $cliente['tipoDocumento'] . ': ' . $cliente['numeroDocumento'];
+            $clienteDoc = $cliente['tipoDocumento'] . ': ' . ($cliente['numeroDocumento'] ? htmlspecialchars($cliente['numeroDocumento']) : '-----');
         }
 
         $pdf->SetFont('Arial', 'B', 8);
@@ -482,13 +482,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
-            flex-wrap: wrap;
         }
-        .payment-info > label, .payment-info > span {
-            flex-basis: 48%;
+        .payment-info .form-group {
+            margin-bottom: 0;
+            flex-grow: 1;
         }
-        .payment-info #montoPagado {
+        .payment-info > span {
             flex-basis: 48%;
+            text-align: right;
+            font-weight: bold;
         }
         .payment-info #cambioAmount {
             font-weight: bold;
@@ -550,59 +552,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .toast.warning {
             background-color: #ff9800;
         }
-        .search-container {
+        /* Estilos para el desplegable de clientes */
+        .dropdown-container {
             position: relative;
-            margin-bottom: 15px;
         }
-        .search-container #clienteSearch {
-            width: 100%;
-            padding-right: 40px;
+        .dropdown-input {
+            cursor: pointer;
         }
-        .search-container #search-icon {
+        .dropdown-list {
             position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #b0bec5;
-        }
-        #clienteList {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
             border: 2px solid var(--border-color);
             border-radius: 12px;
             max-height: 250px;
             overflow-y: auto;
-            background: white;
+            box-shadow: var(--shadow-strong);
+            z-index: 10;
+            padding: 5px 0;
+            display: none;
         }
-        #clienteList li {
+        .dropdown-list.show {
+            display: block;
+        }
+        .dropdown-item {
             padding: 12px 15px;
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s ease, border-color 0.2s ease;
+            transition: background-color 0.2s ease, border-left 0.2s ease;
         }
-        #clienteList li:last-child {
-            border-bottom: none;
-        }
-        #clienteList li:hover {
+        .dropdown-item:hover, .dropdown-item.selected {
             background-color: var(--bg-light);
-        }
-        #clienteList li.selected {
-            background-color: rgba(0, 184, 148, 0.05);
             border-left: 4px solid var(--primary-color);
-            font-weight: bold;
         }
-        .cliente-radio {
-            display: none;
-        }
-        .cliente-details {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-        }
-        .cliente-doc {
-            color: var(--text-light);
-            font-size: 13px;
+        .dropdown-item:last-child {
+            border-bottom: none;
         }
     </style>
 </head>
@@ -622,24 +608,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form method="POST" id="formBoleta">
                 <div class="form-section">
                     <h3 class="section-title"><i class="fas fa-user-tag"></i> Seleccionar Cliente</h3>
-                    <div class="form-group">
+                    <div class="form-group dropdown-container">
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
-                        <div class="search-container">
-                            <input type="text" id="clienteSearch" class="form-input" placeholder="Nombre o DNI del cliente">
-                            <i class="fas fa-search" id="search-icon"></i>
-                        </div>
-                        <ul id="clienteList">
-                            <li data-id="0">
-                                <input type="radio" name="idCliente" value="0" id="cliente-0" class="cliente-radio" required>
-                                <label for="cliente-0" class="cliente-details">
+                        <input type="text" id="clienteSearch" class="form-input dropdown-input" placeholder="Nombre o DNI del cliente" readonly>
+                        <ul id="clienteList" class="dropdown-list">
+                            <li class="dropdown-item" data-id="0" data-nombre="Cliente Indocumentado" data-dni="-----">
+                                <label>
                                     <span class="cliente-nombre">Cliente Indocumentado</span>
                                     <span class="cliente-doc">(-----)</span>
                                 </label>
                             </li>
                             <?php while($cli = mysqli_fetch_assoc($resultClientes)): ?>
-                                <li data-id="<?php echo $cli['idCliente']; ?>">
-                                    <input type="radio" name="idCliente" value="<?php echo $cli['idCliente']; ?>" id="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-radio">
-                                    <label for="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-details">
+                                <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-dni="<?php echo htmlspecialchars($cli['numeroDocumento']); ?>">
+                                    <label>
                                         <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
                                         <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento']); ?>)</span>
                                     </label>
@@ -647,6 +628,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?php endwhile; ?>
                         </ul>
                     </div>
+                    <input type="hidden" name="idCliente" id="idClienteHidden" required>
                 </div>
 
                 <div class="form-section">
@@ -685,13 +667,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="payment-panel">
                         <h4><i class="fas fa-cash-register"></i> Pago</h4>
-                        <div class="form-group payment-info">
-                            <label for="montoPagado" class="form-label">Monto Pagado</label>
-                            <input type="number" step="0.01" min="0" class="form-input" id="montoPagado" required placeholder="0.00">
-                        </div>
-                        <div class="form-group payment-info">
-                            <span class="form-label">Cambio:</span>
-                            <span id="cambioAmount">S/. 0.00</span>
+                        <div class="payment-info">
+                            <div class="form-group">
+                                <label for="montoPagado" class="form-label">Monto Pagado</label>
+                                <input type="number" step="0.01" min="0" class="form-input" id="montoPagado" required placeholder="0.00">
+                            </div>
+                            <div class="form-group" style="text-align: right;">
+                                <span class="form-label">Cambio:</span>
+                                <span id="cambioAmount">S/. 0.00</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -713,6 +697,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const formBoleta = document.getElementById('formBoleta');
             const clienteSearchInput = document.getElementById('clienteSearch');
             const clienteList = document.getElementById('clienteList');
+            const idClienteHidden = document.getElementById('idClienteHidden');
             const productsList = document.getElementById('productsList');
             const summaryPanel = document.getElementById('summaryPanel');
             const summaryItems = document.getElementById('summaryItems');
@@ -723,9 +708,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const toast = document.getElementById('toast');
 
             let total = 0;
-            const clienteRadios = document.querySelectorAll('.cliente-radio');
-            const allClientes = Array.from(clienteList.querySelectorAll('li'));
+            const allClientes = Array.from(clienteList.querySelectorAll('.dropdown-item'));
+            
+            // Lógica del desplegable de clientes
+            clienteSearchInput.addEventListener('focus', () => clienteList.classList.add('show'));
+            clienteSearchInput.addEventListener('blur', () => {
+                setTimeout(() => clienteList.classList.remove('show'), 200);
+            });
+            clienteSearchInput.addEventListener('input', () => {
+                const filter = clienteSearchInput.value.toLowerCase();
+                allClientes.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    item.style.display = text.includes(filter) ? 'block' : 'none';
+                });
+            });
 
+            clienteList.addEventListener('click', (e) => {
+                const item = e.target.closest('.dropdown-item');
+                if (item) {
+                    const id = item.dataset.id;
+                    const nombre = item.dataset.nombre;
+                    const dni = item.dataset.dni;
+
+                    idClienteHidden.value = id;
+                    clienteSearchInput.value = `${nombre} (${dni})`;
+                    clienteList.classList.remove('show');
+
+                    allClientes.forEach(li => li.classList.remove('selected'));
+                    item.classList.add('selected');
+                    
+                    updatePaymentDetails();
+                }
+            });
+
+            // Lógica de cálculo y visualización
             function updateTotal() {
                 total = 0;
                 let itemsHtml = '';
@@ -763,7 +779,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             function updatePaymentDetails() {
                 const montoPagado = parseFloat(montoPagadoInput.value) || 0;
                 let cambio = montoPagado - total;
-                const clienteSeleccionado = document.querySelector('input[name="idCliente"]:checked');
+                const clienteSeleccionado = idClienteHidden.value;
 
                 if (montoPagado >= total && total > 0 && clienteSeleccionado) {
                     cambioAmountSpan.textContent = `S/. ${cambio.toFixed(2)}`;
@@ -781,32 +797,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     toast.classList.remove('show');
                 }, 3000);
             }
-
-            // Filtro de clientes
-            clienteSearchInput.addEventListener('input', function() {
-                const filter = this.value.toLowerCase();
-                allClientes.forEach(item => {
-                    const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(filter) ? 'block' : 'none';
-                });
-            });
-
-            // Selección de cliente
-            clienteList.addEventListener('click', function(e) {
-                const listItem = e.target.closest('li');
-                if (listItem) {
-                    const radio = listItem.querySelector('input[type="radio"]');
-                    if (radio) {
-                        radio.checked = true;
-                        
-                        // Remover clase 'selected' de todos los li y añadirla al seleccionado
-                        allClientes.forEach(li => li.classList.remove('selected'));
-                        listItem.classList.add('selected');
-
-                        updatePaymentDetails();
-                    }
-                }
-            });
 
             // Event Listeners
             productsList.addEventListener('change', (event) => {
@@ -832,11 +822,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
             
             montoPagadoInput.addEventListener('input', updatePaymentDetails);
-            clienteRadios.forEach(radio => radio.addEventListener('change', updatePaymentDetails));
 
             formBoleta.addEventListener('submit', function(e) {
                 const selectedProductsCount = productsList.querySelectorAll('.product-item.selected').length;
-                const clienteSeleccionado = document.querySelector('input[name="idCliente"]:checked');
+                const clienteSeleccionado = idClienteHidden.value;
 
                 if (selectedProductsCount === 0) {
                     e.preventDefault();
