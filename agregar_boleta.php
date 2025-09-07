@@ -1,7 +1,13 @@
 <?php
 session_start();
+// Asegúrate de que tu archivo de conexión esté configurado para UTF-8.
 include(__DIR__ . "/conexion.php");
 require(__DIR__ . "/fpdf/fpdf.php");
+
+// Configuración de la conexión para UTF-8 (esto es clave)
+mysqli_set_charset($conn, "utf8mb4");
+mysqli_query($conn, "SET NAMES 'utf8mb4'");
+
 
 // Verificación de sesión
 if (!isset($_SESSION['idUsuario'])) {
@@ -125,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('Arial', '', 8);
         $pdf->Ln(3);
-        $pdf->Cell($anchoEfectivo, 4, 'Cajero: ' . $usuarioNombre, 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, iconv('UTF-8', 'ISO-8859-1//IGNORE', 'Cajero: ' . $usuarioNombre), 0, 1, 'C');
         $pdf->Ln(1);
         $ruc = "10345678901";
         $numeroBoleta = 'BOL' . str_pad($idVenta, 5, '0', STR_PAD_LEFT);
@@ -137,6 +143,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(5);
 
         // LÓGICA CORREGIDA AQUÍ
+        $direccion = '';
+        $telefono = '';
+
         if ($idCliente != 0) {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
@@ -154,12 +163,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $clienteNumeroDoc = '-----';
                 $clienteTipoDoc = 'DNI'; 
             }
+            $direccion = isset($cliente['direccion']) ? $cliente['direccion'] : '';
+            $telefono = isset($cliente['telefono']) ? $cliente['telefono'] : '';
+
         } else {
             if (empty($clienteNumeroDoc)) {
                 $clienteNumeroDoc = '-----';
             }
         }
-        
+
+        // Conversión a ISO-8859-1 para FPDF
+        $clienteNombre = iconv('UTF-8', 'ISO-8859-1//IGNORE', $clienteNombre);
+        $direccion = iconv('UTF-8', 'ISO-8859-1//IGNORE', $direccion);
+        $telefono = iconv('UTF-8', 'ISO-8859-1//IGNORE', $telefono);
+
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
@@ -167,13 +184,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, $clienteTipoDoc . ': ' . $clienteNumeroDoc, 0, 1, 'L');
-        if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
+        if (!empty($direccion)) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $direccion, 0, 1, 'L');
         }
-        if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
+        if (!empty($telefono)) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . $cliente['telefono'], 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . $telefono, 0, 1, 'L');
         }
         $pdf->Ln(5);
 
@@ -197,6 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
+            $nombreProducto = iconv('UTF-8', 'ISO-8859-1//IGNORE', $nombreProducto);
+
             $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar);
             $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
             $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
@@ -225,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 5, 'DETALLE DE PAGO', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 8);
-        $pdf->Cell($anchoEfectivo / 2, 4, 'Monto Pagado:', 0, 0, 'L');
+        $pdf->Cell($anchoEfectivo / 2, 4, iconv('UTF-8', 'ISO-8859-1//IGNORE', 'Monto Pagado:'), 0, 0, 'L');
         $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($montoPagado, 2), 0, 1, 'R');
         $pdf->Cell($anchoEfectivo / 2, 4, 'Cambio:', 0, 0, 'L');
         $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($cambio, 2), 0, 1, 'R');
@@ -234,14 +253,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(6);
         $pdf->SetFont('Arial', 'I', 7);
         $pdf->SetTextColor(100, 100, 100);
-        $pdf->Cell($anchoEfectivo, 4, '¡Gracias por su compra!', 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, iconv('UTF-8', 'ISO-8859-1//IGNORE', '¡Gracias por su compra!'), 0, 1, 'C');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, 'www.aromasac.com', 0, 1, 'C');
         $pdf->Ln(3);
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->SetTextColor(170, 170, 170);
         $pdf->Cell($anchoEfectivo, 4, 'Esta nota no tiene valor tributario.', 0, 1, 'C');
-        $pdf->Cell($anchoEfectivo, 4, 'Solicite su Boleta de Venta o Factura.', 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, iconv('UTF-8', 'ISO-8859-1//IGNORE', 'Solicite su Boleta de Venta o Factura.'), 0, 1, 'C');
 
         $pdfContent = $pdf->Output('S');
 
@@ -350,10 +369,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             gap: 10px;
         }
         .form-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             margin-bottom: 35px;
         }
         .form-group {
             margin-bottom: 20px;
+            width: 100%; /* Para que los inputs ocupen todo el ancho */
+            max-width: 400px; /* Limita el ancho para centrarlo mejor */
         }
         .form-label {
             display: block;
@@ -567,6 +591,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         /* Estilos para el desplegable de clientes */
         .dropdown-container {
             position: relative;
+            width: 100%;
         }
         .dropdown-input {
             cursor: pointer;
