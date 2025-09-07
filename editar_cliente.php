@@ -39,13 +39,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nombres = trim($_POST['nombres']);
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    
-    // CORRECCIÓN: Verificar si la clave existe antes de usarla y manejar el trim() con un valor no-null
-    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
-    $direccion = trim($_POST['direccion']);
-    $telefono = trim($_POST['telefono']);
 
-    // Corrección: Manejar el tipo de documento "Indocumentado"
+    // CORRECCIÓN: Usar el operador de fusión de null (??) para evitar el error de "Undefined array key"
+    // Esto asegura que $numeroDocumento sea una cadena vacía si no se envió en el POST.
+    $numeroDocumento = trim($_POST['numeroDocumento'] ?? '');
+    
+    $direccion = trim($_POST['direccion'] ?? '');
+    $telefono = trim($_POST['telefono'] ?? '');
+
+    // Manejar el tipo de documento "Indocumentado"
     if ($tipoDocumento === 'IND') {
         $tipoDocumentoParaBD = 'indocumentado';
         $numeroDocumentoParaBD = null; // Guardar NULL en la base de datos para el número de documento
