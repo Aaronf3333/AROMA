@@ -3,11 +3,13 @@ session_start();
 include(__DIR__ . "/conexion.php");
 require(__DIR__ . "/fpdf/fpdf.php");
 
+// Verificación de sesión
 if (!isset($_SESSION['idUsuario'])) {
     header("Location: login.php");
     exit();
 }
 
+// Variables de sesión
 $idUsuario = $_SESSION['idUsuario'];
 $usuarioNombre = $_SESSION['nombres'] . ' ' . $_SESSION['apellidos'];
 $mensaje = $_SESSION['mensaje'] ?? '';
@@ -23,7 +25,7 @@ $sqlClientes = "SELECT c.idCliente, p.nombres, p.apellidos, p.tipoDocumento, p.n
 $resultClientes = mysqli_query($conn, $sqlClientes);
 
 // Obtener productos activos
-$sqlProductos = "SELECT idProducto, nombreProducto, precio FROM producto WHERE estado=1 ORDER BY nombreProducto ASC";
+$sqlProductos = "SELECT idProducto, nombreProducto, precio FROM producto WHERE estado = 1 ORDER BY nombreProducto ASC";
 $resultProductos = mysqli_query($conn, $sqlProductos);
 
 // -------------------------
@@ -37,9 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $total = 0;
     $detalleProductos = [];
 
-    // Validaciones iniciales
+    // Validaciones
     if ($idCliente === null || empty($productosSeleccionados)) {
-        $_SESSION['mensaje'] = "Error: Por favor, seleccione un cliente y al menos un producto.";
+        $_SESSION['mensaje'] = "Error: Por favor, selecciona un cliente y al menos un producto.";
         $_SESSION['tipo'] = "warning";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
@@ -49,12 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($productosSeleccionados as $idProd => $cantData) {
         $cantidad = intval($cantData['cantidad']);
         $precioUnitario = floatval($cantData['precioUnitario']);
-
         if ($cantidad <= 0 || $precioUnitario <= 0) {
             $validacionExitosa = false;
             break;
         }
-
         $subtotal = $cantidad * $precioUnitario;
         $total += $subtotal;
         $detalleProductos[$idProd] = [
@@ -63,22 +63,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'nombre' => htmlspecialchars($cantData['nombre'])
         ];
     }
-
     if (!$validacionExitosa) {
         $_SESSION['mensaje'] = "Error: La cantidad y el precio del producto deben ser mayores a cero.";
         $_SESSION['tipo'] = "warning";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+    if ($montoPagado < $total) {
+        $_SESSION['mensaje'] = "Error: El monto pagado debe ser mayor o igual al total.";
+        $_SESSION['tipo'] = "warning";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
 
-    // Iniciar una transacción
+    // Iniciar transacción
     mysqli_begin_transaction($conn);
     try {
         // 1. Insertar Venta
         $sqlVenta = "INSERT INTO venta (idUsuario, idCliente, total) VALUES (?, ?, ?)";
         $stmtVenta = mysqli_prepare($conn, $sqlVenta);
         if (!$stmtVenta) throw new Exception("Error al preparar venta: " . mysqli_error($conn));
-        
         $idClienteDB = ($idCliente == 0) ? null : $idCliente;
         mysqli_stmt_bind_param($stmtVenta, "iid", $idUsuario, $idClienteDB, $total);
         mysqli_stmt_execute($stmtVenta);
@@ -118,16 +122,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(3);
         $pdf->Cell($anchoEfectivo, 4, 'Cajero: ' . $usuarioNombre, 0, 1, 'C');
         $pdf->Ln(1);
-
         $ruc = "10345678901";
         $numeroBoleta = 'BOL' . str_pad($idVenta, 5, '0', STR_PAD_LEFT);
         $pdf->Cell($anchoEfectivo, 4, 'RUC: ' . $ruc, 0, 1, 'C');
         $pdf->Cell($anchoEfectivo, 4, 'Nro: ' . $numeroBoleta, 0, 1, 'C');
-
         date_default_timezone_set('America/Lima');
         $fechaEmision = date('d/m/Y H:i:s');
         $pdf->Cell($anchoEfectivo, 4, 'Fecha: ' . $fechaEmision, 0, 1, 'C');
-
         $pdf->Ln(5);
 
         // Info cliente
@@ -150,12 +151,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 7);
-        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
+        $pdf->Cell($anchoEfectivo, 4, utf8_decode($clienteNombre), 0, 1, 'L');
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L');
+        $pdf->Cell($anchoEfectivo, 4, utf8_decode($clienteDoc), 0, 1, 'L');
         if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, utf8_decode('Dir: ' . $cliente['direccion']), 0, 1, 'L');
         }
         if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
             $pdf->Ln(1);
@@ -168,14 +169,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $anchoCantidad = 10;
         $anchoPrecio = 13;
         $anchoSubtotal = 13;
-
         $pdf->SetFillColor(230, 230, 230);
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->Cell($anchoProducto, 6, 'PRODUCTO', 1, 0, 'C', true);
         $pdf->Cell($anchoCantidad, 6, 'CANT', 1, 0, 'C', true);
         $pdf->Cell($anchoPrecio, 6, 'PRECIO', 1, 0, 'C', true);
         $pdf->Cell($anchoSubtotal, 6, 'TOTAL', 1, 1, 'C', true);
-
         $pdf->SetFont('Arial', '', 7);
         $pdf->SetFillColor(248, 248, 248);
         $alternar = false;
@@ -185,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
-            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar);
+            $pdf->Cell($anchoProducto, 6, utf8_decode($nombreProducto), 1, 0, 'L', $alternar);
             $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
             $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
             $pdf->Cell($anchoSubtotal, 6, 'S/ ' . number_format($data['cantidad'] * $data['precioUnitario'], 2), 1, 1, 'R', $alternar);
@@ -212,11 +211,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->SetTextColor(0, 0, 0);
         $pdf->Cell($anchoEfectivo, 5, 'DETALLE DE PAGO', 0, 1, 'L');
         $pdf->Ln(1);
-
         $pdf->SetFont('Arial', '', 8);
         $pdf->Cell($anchoEfectivo / 2, 4, 'Monto Pagado:', 0, 0, 'L');
         $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($montoPagado, 2), 0, 1, 'R');
-
         $pdf->Cell($anchoEfectivo / 2, 4, 'Cambio:', 0, 0, 'L');
         $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($cambio, 2), 0, 1, 'R');
 
@@ -228,8 +225,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, 'www.aromasac.com', 0, 1, 'C');
         $pdf->Ln(3);
-
-        // NOTA LEGAL
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->SetTextColor(170, 170, 170);
         $pdf->Cell($anchoEfectivo, 4, utf8_decode('Esta nota no tiene valor tributario.'), 0, 1, 'C');
@@ -237,15 +232,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdfContent = $pdf->Output('S');
 
-        // Guardar en MySQL como BLOB
+        // Guardar en MySQL
         $sqlBoleta = "INSERT INTO boleta (idVenta, numeroBoleta, archivoPDF) VALUES (?, ?, ?)";
         $stmtBoleta = mysqli_prepare($conn, $sqlBoleta);
         if (!$stmtBoleta) throw new Exception("Error al preparar boleta: " . mysqli_error($conn));
         mysqli_stmt_bind_param($stmtBoleta, "iss", $idVenta, $numeroBoleta, $pdfContent);
-        
         $null = NULL;
         mysqli_stmt_send_long_data($stmtBoleta, 2, $pdfContent);
-        
         if (!mysqli_stmt_execute($stmtBoleta)) {
             throw new Exception("Error al insertar boleta: " . mysqli_stmt_error($stmtBoleta));
         }
@@ -255,7 +248,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $_SESSION['mensaje'] = "Boleta generada correctamente.";
         $_SESSION['tipo'] = "success";
-
         header("Location: boletas.php");
         exit();
     } catch (Exception $e) {
@@ -274,6 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generar Boleta - Aroma S.A.C</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
             --primary-color: #00b894;
@@ -489,6 +482,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .payment-info > label, .payment-info > span {
+            flex-basis: 48%;
+        }
+        .payment-info #montoPagado {
+            flex-basis: 48%;
         }
         .payment-info #cambioAmount {
             font-weight: bold;
@@ -510,6 +510,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 6px 20px rgba(0, 184, 148, 0.3);
             width: 100%;
             margin-top: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
         .btn-submit:hover:not(:disabled) {
             transform: translateY(-2px);
@@ -575,7 +579,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 12px 15px;
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
         #clienteList li:last-child {
             border-bottom: none;
@@ -583,13 +587,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         #clienteList li:hover {
             background-color: var(--bg-light);
         }
+        #clienteList li.selected {
+            background-color: rgba(0, 184, 148, 0.05);
+            border-left: 4px solid var(--primary-color);
+            font-weight: bold;
+        }
+        .cliente-radio {
+            display: none;
+        }
+        .cliente-details {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .cliente-doc {
+            color: var(--text-light);
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
     <?php include(__DIR__ . "/includes/header.php"); ?>
 
     <div class="container">
-        <h1 class="page-title">💼 Generar Nueva Boleta</h1>
+        <h1 class="page-title"><i class="fas fa-file-invoice"></i> Generar Nueva Boleta</h1>
         
         <?php if ($mensaje): ?>
             <div class="toast show <?php echo htmlspecialchars($tipoMensaje); ?>" style="position: static; transform: none; margin-bottom: 20px; opacity: 1; visibility: visible;">
@@ -600,7 +621,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="main-card">
             <form method="POST" id="formBoleta">
                 <div class="form-section">
-                    <h3 class="section-title">👤 Seleccionar Cliente</h3>
+                    <h3 class="section-title"><i class="fas fa-user-tag"></i> Seleccionar Cliente</h3>
                     <div class="form-group">
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
                         <div class="search-container">
@@ -609,18 +630,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <ul id="clienteList">
                             <li data-id="0">
-                                <input type="radio" name="idCliente" value="0" id="cliente-0" class="cliente-radio" style="display:none;" required>
-                                <label for="cliente-0">
+                                <input type="radio" name="idCliente" value="0" id="cliente-0" class="cliente-radio" required>
+                                <label for="cliente-0" class="cliente-details">
                                     <span class="cliente-nombre">Cliente Indocumentado</span>
                                     <span class="cliente-doc">(-----)</span>
                                 </label>
                             </li>
                             <?php while($cli = mysqli_fetch_assoc($resultClientes)): ?>
                                 <li data-id="<?php echo $cli['idCliente']; ?>">
-                                    <input type="radio" name="idCliente" value="<?php echo $cli['idCliente']; ?>" id="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-radio" style="display:none;">
-                                    <label for="cliente-<?php echo $cli['idCliente']; ?>">
+                                    <input type="radio" name="idCliente" value="<?php echo $cli['idCliente']; ?>" id="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-radio">
+                                    <label for="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-details">
                                         <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
-                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['tipoDocumento'].' '.$cli['numeroDocumento']); ?>)</span>
+                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento']); ?>)</span>
                                     </label>
                                 </li>
                             <?php endwhile; ?>
@@ -629,7 +650,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-section">
-                    <h3 class="section-title">📦 Seleccionar Productos</h3>
+                    <h3 class="section-title"><i class="fas fa-boxes"></i> Seleccionar Productos</h3>
                     <div class="products-list" id="productsList">
                         <?php while($prod = mysqli_fetch_assoc($resultProductos)): ?>
                             <div class="product-item" data-id="<?php echo $prod['idProducto']; ?>">
@@ -656,14 +677,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="summary-panel" id="summaryPanel">
-                    <div class="section-title">📊 Resumen de la Venta</div>
+                    <div class="section-title"><i class="fas fa-receipt"></i> Resumen de la Venta</div>
                     <ul class="summary-list" id="summaryItems"></ul>
                     <div class="summary-item total-row">
                         <span>Total a Pagar:</span>
                         <span id="totalAmount">S/. 0.00</span>
                     </div>
                     <div class="payment-panel">
-                        <h4>💰 Pago</h4>
+                        <h4><i class="fas fa-cash-register"></i> Pago</h4>
                         <div class="form-group payment-info">
                             <label for="montoPagado" class="form-label">Monto Pagado</label>
                             <input type="number" step="0.01" min="0" class="form-input" id="montoPagado" required placeholder="0.00">
@@ -679,7 +700,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="hidden" name="cambio_hidden" id="cambioHidden">
 
                 <button type="submit" class="btn-submit" id="submitBtn" disabled>
-                    💾 Generar Boleta
+                    <i class="fas fa-save"></i> Generar Boleta
                 </button>
             </form>
         </div>
@@ -703,6 +724,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             let total = 0;
             const clienteRadios = document.querySelectorAll('.cliente-radio');
+            const allClientes = Array.from(clienteList.querySelectorAll('li'));
 
             function updateTotal() {
                 total = 0;
@@ -763,10 +785,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Filtro de clientes
             clienteSearchInput.addEventListener('input', function() {
                 const filter = this.value.toLowerCase();
-                const items = clienteList.querySelectorAll('li');
-                items.forEach(item => {
+                allClientes.forEach(item => {
                     const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(filter) ? '' : 'none';
+                    item.style.display = text.includes(filter) ? 'block' : 'none';
                 });
             });
 
@@ -777,6 +798,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     const radio = listItem.querySelector('input[type="radio"]');
                     if (radio) {
                         radio.checked = true;
+                        
+                        // Remover clase 'selected' de todos los li y añadirla al seleccionado
+                        allClientes.forEach(li => li.classList.remove('selected'));
+                        listItem.classList.add('selected');
+
                         updatePaymentDetails();
                     }
                 }
@@ -824,8 +850,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return;
                 }
 
+                if (parseFloat(montoPagadoInput.value) < total) {
+                    e.preventDefault();
+                    showToast('El monto pagado debe ser mayor o igual al total.', 'warning');
+                    return;
+                }
+
                 submitBtn.disabled = true;
-                submitBtn.textContent = 'Procesando...';
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
                 document.getElementById('montoPagadoHidden').value = montoPagadoInput.value;
                 document.getElementById('cambioHidden').value = parseFloat(cambioAmountSpan.textContent.replace('S/. ', '')) || 0;
