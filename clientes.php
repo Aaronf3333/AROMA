@@ -22,6 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $numeroDocumento = trim($_POST['numeroDocumento']);
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
+    
+    // Convertir a minúsculas si el tipo de documento es "IND"
+    // y asegurar que el número de documento esté vacío si no es requerido
+    if ($tipoDocumento === 'IND') {
+        $tipoDocumentoParaBD = 'indocumentado';
+        $numeroDocumento = ''; 
+    } else {
+        $tipoDocumentoParaBD = $tipoDocumento;
+    }
 
     // Iniciar una transacción para asegurar la integridad de los datos
     $conn->begin_transaction();
@@ -30,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         // Verificar si la persona ya existe en la tabla `Persona`
         $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
         $stmtCheck = $conn->prepare($checkSql);
-        $stmtCheck->bind_param("ss", $tipoDocumento, $numeroDocumento);
+        $stmtCheck->bind_param("ss", $tipoDocumentoParaBD, $numeroDocumento);
         $stmtCheck->execute();
         $resultCheck = $stmtCheck->get_result();
         $rowCheck = $resultCheck->fetch_assoc();
@@ -63,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
                             VALUES (?, ?, ?, ?, ?, ?)";
             $stmtPersona = $conn->prepare($sqlPersona);
-            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
+            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
             $stmtPersona->execute();
 
             // Obtener el ID de la persona recién insertada (MySQL)
@@ -599,14 +608,15 @@ $conn->close();
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <select name="tipoDocumento" required class="form-input">
+                    <select name="tipoDocumento" id="tipoDocumento" required class="form-input">
                         <option value="">Seleccione tipo de documento</option>
                         <option value="DNI">DNI</option>
                         <option value="CE">CE</option>
+                        <option value="IND">Indocumentado</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <input type="text" name="numeroDocumento" placeholder="Número de documento" required class="form-input">
+                    <input type="text" name="numeroDocumento" id="numeroDocumento" placeholder="Número de documento" required class="form-input">
                 </div>
             </div>
             <div class="form-row">
@@ -683,7 +693,16 @@ $conn->close();
                 <td data-label="ID"><?php echo $row['idCliente']; ?></td>
                 <td data-label="Nombres" class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
                 <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
-                <td data-label="Tipo Doc." class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
+                <td data-label="Tipo Doc." class="tipo-doc-cell">
+                    <?php
+                    // Display 'Indocumentado' if the value from the database is 'indocumentado'
+                    if (strtolower($row['tipoDocumento']) === 'indocumentado') {
+                        echo 'Indocumentado';
+                    } else {
+                        echo htmlspecialchars($row['tipoDocumento']);
+                    }
+                    ?>
+                </td>
                 <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
                 <td data-label="Dirección" class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
                 <td data-label="Teléfono" class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
@@ -717,6 +736,22 @@ $conn->close();
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const tipoDocumentoSelect = document.getElementById('tipoDocumento');
+            const numeroDocumentoInput = document.getElementById('numeroDocumento');
+
+            tipoDocumentoSelect.addEventListener('change', function() {
+                if (this.value === 'IND') {
+                    numeroDocumentoInput.value = '';
+                    numeroDocumentoInput.placeholder = 'No requerido';
+                    numeroDocumentoInput.disabled = true;
+                    numeroDocumentoInput.removeAttribute('required');
+                } else {
+                    numeroDocumentoInput.placeholder = 'Número de documento';
+                    numeroDocumentoInput.disabled = false;
+                    numeroDocumentoInput.setAttribute('required', 'required');
+                }
+            });
+
             const searchInput = document.getElementById('searchInput');
             const clearSearch = document.getElementById('clearSearch');
             const filterBy = document.getElementById('filterBy');
@@ -740,7 +775,8 @@ $conn->close();
             // Función para limpiar highlights
             function clearHighlights() {
                 document.querySelectorAll('.highlight').forEach(el => {
-                    el.outerHTML = el.innerHTML;
+                    const parent = el.parentNode;
+                    parent.innerHTML = parent.textContent;
                 });
             }
             
@@ -897,4 +933,3 @@ $conn->close();
 <?php include(__DIR__ . "/includes/footer.php"); ?>
 </body>
 </html>
-
