@@ -20,7 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $nombres = trim($_POST['nombres']);
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = trim($_POST['numeroDocumento']);
+
+    // CORRECCIÓN: Verifica si la clave existe antes de intentar acceder a ella
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
+
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
 
@@ -68,12 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
             // Si la persona ya existe como cliente, mostramos una advertencia
             $_SESSION['mensaje'] = "Esta persona ya está registrada como cliente.";
             $_SESSION['tipo'] = "warning";
-            
-            // Si la persona ya existe, no es necesario hacer un rollback o commit
-            // En este caso, solo salimos de la transacción sin hacer nada
-            $conn->commit();
-            header("Location: clientes.php");
-            exit();
         } else {
             // Si la persona no es cliente, la insertamos
             $sqlCliente = "INSERT INTO cliente (idPersona) VALUES (?)";
@@ -85,7 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
             $_SESSION['mensaje'] = "Cliente agregado correctamente.";
             $_SESSION['tipo'] = "success";
         }
-
 
         $conn->commit();
     } catch (mysqli_sql_exception $e) {
@@ -100,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         }
     }
 
+    // CORRECCIÓN: La redirección ahora es la última acción, asegurando que no haya salida antes.
     header("Location: clientes.php");
     exit();
 }
@@ -751,12 +748,14 @@ $conn->close();
             tipoDocumentoSelect.addEventListener('change', function() {
                 if (this.value === 'indocumentado') {
                     numeroDocumentoInput.required = false;
-                    numeroDocumentoInput.disabled = true;
-                    numeroDocumentoInput.placeholder = "No requerido";
+                    // CORRECCIÓN: Usar readonly en lugar de disabled
+                    numeroDocumentoInput.readOnly = true;
+                    numeroDocumentoInput.placeholder = "No aplica";
                     numeroDocumentoInput.value = '';
                 } else {
                     numeroDocumentoInput.required = true;
-                    numeroDocumentoInput.disabled = false;
+                    // CORRECCIÓN: Quitar la propiedad readonly
+                    numeroDocumentoInput.readOnly = false;
                     numeroDocumentoInput.placeholder = "Número de documento";
                 }
             });
