@@ -11,39 +11,28 @@ if (!isset($_SESSION['idUsuario'])) {
 // PROCESAR NUEVO USUARIO
 // ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
-    $nombres = trim($_POST['nombres']);
-    $apellidos = trim($_POST['apellidos']);
+    $nombres = $_POST['nombres'];
+    $apellidos = $_POST['apellidos'];
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
-    $direccion = trim($_POST['direccion']);
-    $telefono = trim($_POST['telefono']);
-    $usuario = trim($_POST['usuario']);
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
+    $direccion = $_POST['direccion'];
+    $telefono = $_POST['telefono'];
+    $usuario = $_POST['usuario'];
     $contrasena = $_POST['contrasena'];
     $idRol = intval($_POST['idRol']);
 
-    // Validación en el servidor
-    if (empty($nombres) || empty($apellidos) || empty($tipoDocumento) || empty($direccion) || empty($telefono) || empty($usuario) || empty($contrasena) || empty($idRol)) {
-        $_SESSION['toast_message'] = "Por favor, complete todos los campos requeridos.";
-        $_SESSION['toast_type'] = 'error';
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-    }
-    
     // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
     if ($tipoDocumento === 'IND') {
-        $tipoDocumentoParaBD = 'indocumentado';
-        $numeroDocumento = '';
+        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
+        $numeroDocumento = null; // Asegurar que el numero de documento esté vacío o NULL en la BD si es indocumentado
     } else {
-        $tipoDocumentoParaBD = $tipoDocumento;
+        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
     }
-
-    // Hashear la contraseña antes de guardarla
-    $contrasena_hash = password_hash($contrasena, PASSWORD_DEFAULT);
 
     $conn->begin_transaction();
 
     try {
-        $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
+        $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono) 
                        VALUES (?, ?, ?, ?, ?, ?)";
         $stmtPersona = $conn->prepare($sqlPersona);
         $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
@@ -53,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
 
         $sqlUsuario = "INSERT INTO usuario (usuario, contrasena, idPersona, idRol) VALUES (?, ?, ?, ?)";
         $stmtUsuario = $conn->prepare($sqlUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena_hash, $idPersona, $idRol);
+        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idPersona, $idRol);
         $stmtUsuario->execute();
 
         $conn->commit();
@@ -74,34 +63,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
 // ------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $idUsuario = intval($_POST['idUsuario']);
-    $nombres = trim($_POST['nombres']);
-    $apellidos = trim($_POST['apellidos']);
+    $nombres = $_POST['nombres'];
+    $apellidos = $_POST['apellidos'];
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
-    $usuario = trim($_POST['usuario']);
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
+    $usuario = $_POST['usuario'];
     $contrasena = $_POST['contrasena'];
-    $direccion = trim($_POST['direccion']);
-    $telefono = trim($_POST['telefono']);
+    $direccion = $_POST['direccion'];
+    $telefono = $_POST['telefono'];
     $idRol = intval($_POST['idRol']);
-
-    // Validación en el servidor
-    if (empty($nombres) || empty($apellidos) || empty($tipoDocumento) || empty($direccion) || empty($telefono) || empty($usuario) || empty($contrasena) || empty($idRol)) {
-        $_SESSION['toast_message'] = "Por favor, complete todos los campos requeridos.";
-        $_SESSION['toast_type'] = 'error';
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-    }
 
     // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
     if ($tipoDocumento === 'IND') {
-        $tipoDocumentoParaBD = 'indocumentado';
-        $numeroDocumento = '';
+        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
+        $numeroDocumento = null; // Asegurar que el numero de documento esté vacío o NULL en la BD si es indocumentado
     } else {
-        $tipoDocumentoParaBD = $tipoDocumento;
+        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
     }
-
-    // Hashear la contraseña antes de guardarla
-    $contrasena_hash = password_hash($contrasena, PASSWORD_DEFAULT);
 
     $conn->begin_transaction();
 
@@ -109,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
         // Actualizar usuario
         $sqlUpdateUsuario = "UPDATE usuario SET usuario = ?, contrasena = ?, idRol = ? WHERE idUsuario = ?";
         $stmtUsuario = $conn->prepare($sqlUpdateUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena_hash, $idRol, $idUsuario);
+        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idRol, $idUsuario);
         $stmtUsuario->execute();
 
         // Obtener idPersona
@@ -123,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
         // Actualizar persona
         $sqlUpdatePersona = "UPDATE persona SET nombres = ?, apellidos = ?, tipoDocumento = ?, numeroDocumento = ?, direccion = ?, telefono = ? WHERE idPersona = ?";
         $stmtPersona = $conn->prepare($sqlUpdatePersona);
+        // Usar 's' para el numeroDocumento incluso si es null para que funcione en bind_param
         $stmtPersona->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono, $idPersona);
         $stmtPersona->execute();
 
@@ -143,8 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
 // OBTENER USUARIOS Y ROLES
 // ------------------
 $sqlUsuarios = "SELECT u.idUsuario, u.usuario, u.contrasena, u.idRol, r.nombreRol, 
-                        p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
-                        p.direccion, p.telefono, p.idPersona
+                       p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
+                       p.direccion, p.telefono, p.idPersona
                 FROM usuario u
                 INNER JOIN rol r ON u.idRol = r.idRol
                 INNER JOIN persona p ON u.idPersona = p.idPersona
@@ -844,25 +823,26 @@ input:disabled {
                                         <div class="user-info">
                                             <div class="user-name">
                                                 <?php
+                                                // Mostrar "Indocumentado" si el valor en BD es 'indocumentado'
                                                 if ($row['tipoDocumento'] === 'indocumentado') {
                                                     echo 'Indocumentado';
                                                 } else {
-                                                    echo htmlspecialchars($row['tipoDocumento']);
+                                                    echo htmlspecialchars($row['tipoDocumento'] ?? '');
                                                 }
                                                 ?>
                                             </div>
-                                            <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento']); ?></div>
+                                            <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento'] ?? ''); ?></div>
                                         </div>
                                     </td>
-                                    <td><?php echo htmlspecialchars($row['direccion']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['telefono']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['direccion'] ?? ''); ?></td>
+                                    <td><?php echo htmlspecialchars($row['telefono'] ?? ''); ?></td>
                                     <td>
                                         <span class="badge">
-                                            <?php echo htmlspecialchars($row['nombreRol']); ?>
+                                            <?php echo htmlspecialchars($row['nombreRol'] ?? ''); ?>
                                         </span>
                                     </td>
                                     <td class="actions-cell">
-                                        <button class="btn btn-warning" onclick="abrirModalEditar(this)" data-user='<?php echo htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>'>
+                                        <button class="btn btn-warning" onclick="abrirModalEditar(<?php echo htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>)">
                                             <i class="fas fa-edit"></i> Editar
                                         </button>
                                     </td>
@@ -1129,8 +1109,7 @@ function abrirModal(tipo) {
     }
 }
 
-function abrirModalEditar(button) {
-    const userData = JSON.parse(button.getAttribute('data-user'));
+function abrirModalEditar(userData) {
     currentModal = document.getElementById('modalEditar');
     
     // Llenar los campos del modal con los datos del usuario
@@ -1139,7 +1118,8 @@ function abrirModalEditar(button) {
     document.getElementById('edit_apellidos').value = userData.apellidos;
     // Si el tipo de documento en BD es 'indocumentado', mostrar 'IND' en el select
     document.getElementById('edit_tipoDocumento').value = (userData.tipoDocumento === 'indocumentado' ? 'IND' : userData.tipoDocumento);
-    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento;
+    // Manejar el valor 'null' o vacío del numeroDocumento
+    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento || '';
     document.getElementById('edit_direccion').value = userData.direccion;
     document.getElementById('edit_telefono').value = userData.telefono;
     document.getElementById('edit_usuario').value = userData.usuario;
@@ -1255,9 +1235,6 @@ document.querySelectorAll('form').forEach(form => {
         let isValid = true;
         
         requiredFields.forEach(field => {
-            // No validar campos deshabilitados
-            if (field.disabled) return; 
-
             if (!field.value.trim()) {
                 field.style.borderColor = 'var(--error-color)';
                 field.style.boxShadow = '0 0 0 3px rgba(245, 101, 101, 0.1)';
@@ -1366,7 +1343,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showToast('Por favor ingrese un formato de email válido', 'warning', 3000);
             } else {
                 this.style.borderColor = 'var(--border-color)';
-                this.style.boxShadow = 'none';
+                this.style.boxShadow = 'none'; // Asegurarse de quitar el box-shadow de advertencia
             }
         });
     });
