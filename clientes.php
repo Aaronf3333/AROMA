@@ -19,15 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $nombres = trim($_POST['nombres']);
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = trim($_POST['numeroDocumento']);
-    $direccion = trim($_POST['direccion']);
-    $telefono = trim($_POST['telefono']);
-    
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
+
     // Convertir a minúsculas si el tipo de documento es "IND"
     // y asegurar que el número de documento esté vacío si no es requerido
     if ($tipoDocumento === 'IND') {
         $tipoDocumentoParaBD = 'indocumentado';
-        $numeroDocumento = ''; 
+        $numeroDocumento = '';
     } else {
         $tipoDocumentoParaBD = $tipoDocumento;
     }
@@ -103,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
 // ------------------
 if (isset($_GET['toggle'])) {
     $idCliente = intval($_GET['toggle']);
-    
+
     // Iniciar una transacción para la operación de toggle
     $conn->begin_transaction();
 
@@ -142,7 +140,7 @@ if (isset($_GET['toggle'])) {
 // ------------------
 // OBTENER CLIENTES
 // ------------------
-$sqlClientes = "SELECT c.idCliente, p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
+$sqlClientes = "SELECT c.idCliente, p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento,
                         p.direccion, p.telefono, c.activo
                 FROM cliente c
                 JOIN persona p ON c.idPersona = p.idPersona
@@ -181,50 +179,50 @@ $conn->close();
             --error-color: #c0392b;
         }
 
-        body { 
-            font-family: 'Segoe UI', Arial, sans-serif; 
-            padding: 20px; 
-            background: var(--background-color); 
-            margin: 0; 
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            padding: 20px;
+            background: var(--background-color);
+            margin: 0;
             color: var(--text-color);
         }
-        
+
         main {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 15px;
         }
 
-        .search-section, .add-client-form, .clients-table-container { 
-            background: var(--card-background); 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px var(--shadow-light); 
-            margin-bottom: 30px; 
+        .search-section, .add-client-form, .clients-table-container {
+            background: var(--card-background);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            margin-bottom: 30px;
         }
 
-        .search-container { 
-            display: flex; 
-            gap: 15px; 
-            align-items: center; 
-            flex-wrap: wrap; 
+        .search-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
-        .search-box { 
-            position: relative; 
-            flex: 1; 
-            min-width: 250px; 
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
         }
-        
-        .search-input, .form-input, .filter-select { 
-            width: 100%; 
-            padding: 12px 15px; 
-            border: 2px solid var(--light-gray); 
-            border-radius: 8px; 
-            font-size: 16px; 
-            transition: all 0.3s ease; 
-            background: #f8f9fa; 
-            box-sizing: border-box; 
+
+        .search-input, .form-input, .filter-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--light-gray);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            box-sizing: border-box;
             color: var(--text-color);
         }
 
@@ -232,235 +230,235 @@ $conn->close();
             padding-right: 50px;
         }
 
-        .search-input:focus, .form-input:focus, .filter-select:focus { 
-            outline: none; 
-            border-color: var(--primary-color); 
-            background: var(--card-background); 
-            box-shadow: 0 0 0 3px rgba(59, 59, 152, 0.1); 
-        }
-        
-        .search-icon { 
-            position: absolute; 
-            right: 15px; 
-            top: 50%; 
-            transform: translateY(-50%); 
-            color: var(--gray-text); 
-            font-size: 18px; 
-        }
-        
-        .clear-search { 
-            position: absolute; 
-            right: 45px; 
-            top: 50%; 
-            transform: translateY(-50%); 
-            background: none; 
-            border: none; 
-            color: var(--gray-text); 
-            font-size: 18px; 
-            cursor: pointer; 
-            padding: 5px; 
-            border-radius: 50%; 
-            display: none; 
-        }
-        
-        .clear-search:hover { 
-            background: #e9ecef; 
-            color: #495057; 
+        .search-input:focus, .form-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: var(--card-background);
+            box-shadow: 0 0 0 3px rgba(59, 59, 152, 0.1);
         }
 
-        .search-filters { 
-            display: flex; 
-            gap: 10px; 
-            flex-wrap: wrap; 
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-text);
+            font-size: 18px;
         }
 
-        .filter-select { 
-            padding: 10px 12px; 
-            border-radius: 8px; 
-            font-size: 14px; 
+        .clear-search {
+            position: absolute;
+            right: 45px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--gray-text);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            display: none;
         }
 
-        .search-stats { 
-            margin-top: 15px; 
-            padding: 10px; 
-            background: #e8f4fd; 
-            border-radius: 8px; 
-            color: #2c5aa0; 
-            font-size: 14px; 
-            display: none; 
+        .clear-search:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .search-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .search-stats {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e8f4fd;
+            border-radius: 8px;
+            color: #2c5aa0;
+            font-size: 14px;
+            display: none;
             font-weight: 500;
         }
 
-        .form-row { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 20px; 
-            margin-bottom: 20px; 
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
         }
-        
-        .form-group { 
-            display: flex; 
-            flex-direction: column; 
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
         }
-        
-        .form-button { 
-            background: var(--primary-color); 
-            color: white; 
-            padding: 14px 30px; 
-            border: none; 
-            border-radius: 8px; 
-            font-size: 16px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
+
+        .form-button {
+            background: var(--primary-color);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
             align-self: flex-start;
         }
 
-        .form-button:hover { 
-            background: var(--secondary-color); 
-            transform: translateY(-2px); 
-            box-shadow: 0 6px 15px rgba(59, 59, 152, 0.3); 
+        .form-button:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(59, 59, 152, 0.3);
         }
-        
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
             table-layout: fixed;
         }
-        
+
         /* Ajuste de compacidad */
-        th, td { 
+        th, td {
             padding: 10px 8px; /* Reducción de padding */
             font-size: 13px; /* Reducción del tamaño de la fuente */
-            text-align: center; 
-            border-bottom: 1px solid var(--light-gray); 
+            text-align: center;
+            border-bottom: 1px solid var(--light-gray);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        th { 
-            background: var(--primary-color); 
-            color: white; 
-            font-weight: bold; 
-            position: sticky; 
-            top: 0; 
+        th {
+            background: var(--primary-color);
+            color: white;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
             z-index: 10;
         }
-        
-        tbody tr { 
-            transition: all 0.2s ease; 
+
+        tbody tr {
+            transition: all 0.2s ease;
         }
-        
-        tbody tr:hover { 
-            background-color: #f8f9fa; 
-            transform: translateY(-1px); 
-            box-shadow: 0 2px 8px var(--shadow-light); 
+
+        tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px var(--shadow-light);
         }
-        
-        .status-badge { 
+
+        .status-badge {
             padding: 5px 10px; /* Reducción de padding */
-            border-radius: 20px; 
-            color: white; 
-            font-weight: bold; 
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
             font-size: 11px; /* Reducción del tamaño de la fuente */
-            text-transform: uppercase; 
+            text-transform: uppercase;
             display: inline-block;
         }
 
         .status-active { background: var(--success-color); }
         .status-inactive { background: var(--error-color); }
-        
-        .action-buttons { 
-            display: flex; 
-            justify-content: center; 
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
             gap: 5px; /* Reducción de gap */
-            align-items: center; 
-            flex-wrap: wrap; 
+            align-items: center;
+            flex-wrap: wrap;
         }
-        
-        .btn { 
-            color: white; 
+
+        .btn {
+            color: white;
             padding: 6px 12px; /* Reducción de padding */
-            border-radius: 6px; 
-            text-decoration: none; 
+            border-radius: 6px;
+            text-decoration: none;
             font-size: 12px; /* Reducción del tamaño de la fuente */
-            font-weight: bold; 
-            transition: all 0.3s ease; 
-            border: none; 
-            cursor: pointer; 
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
             white-space: nowrap;
         }
 
-        .btn:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 10px var(--shadow-medium); 
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px var(--shadow-medium);
         }
-        
+
         .btn-edit { background: #00a8ff; }
         .btn-edit:hover { background: #0097e6; }
         .btn-activate { background: var(--success-color); }
         .btn-activate:hover { background: #219a52; }
         .btn-deactivate { background: var(--error-color); }
         .btn-deactivate:hover { background: #d63031; }
-        
-        .no-results { 
-            text-align: center; 
-            padding: 50px; 
-            color: var(--gray-text); 
-            font-size: 18px; 
-            background: var(--card-background); 
-            border-radius: 12px; 
+
+        .no-results {
+            text-align: center;
+            padding: 50px;
+            color: var(--gray-text);
+            font-size: 18px;
+            background: var(--card-background);
+            border-radius: 12px;
             box-shadow: 0 4px 15px var(--shadow-light);
-            margin-top: 20px; 
-            display: none; 
+            margin-top: 20px;
+            display: none;
         }
 
-        .highlight { 
-            background-color: #ffeb3b; 
-            padding: 1px 2px; 
-            border-radius: 2px; 
+        .highlight {
+            background-color: #ffeb3b;
+            padding: 1px 2px;
+            border-radius: 2px;
         }
-        
-        #toast { 
-            position: fixed; 
-            top: 20px; 
-            left: 50%; 
-            transform: translateX(-50%) translateY(-20px); 
-            min-width: 300px; 
-            max-width: 90%; 
-            padding: 18px 25px; 
-            border-radius: 12px; 
-            color: #fff; 
-            font-size: 16px; 
-            font-weight: bold; 
-            text-align: center; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
-            opacity: 0; 
-            transition: opacity 0.5s ease, transform 0.5s ease; 
-            z-index: 9999; 
+
+        #toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            min-width: 300px;
+            max-width: 90%;
+            padding: 18px 25px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            z-index: 9999;
         }
-        
-        #toast.show { 
-            opacity: 1; 
-            transform: translateX(-50%) translateY(0); 
+
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
-        
+
         #toast.success { background-color: var(--success-color); }
         #toast.info { background-color: var(--info-color); }
         #toast.warning { background-color: var(--warning-color); }
         #toast.error { background-color: var(--error-color); }
-        
-        h2 { 
-            color: var(--text-color); 
-            margin-bottom: 25px; 
+
+        h2 {
+            color: var(--text-color);
+            margin-bottom: 25px;
             font-size: 32px;
             font-weight: 700;
         }
 
-        h3 { 
-            color: var(--primary-color); 
-            margin-bottom: 20px; 
+        h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
             font-size: 24px;
             font-weight: 600;
         }
@@ -487,8 +485,8 @@ $conn->close();
         }
 
         @media (max-width: 768px) {
-            body { 
-                padding: 10px; 
+            body {
+                padding: 10px;
             }
             main {
                 padding: 0;
@@ -503,32 +501,32 @@ $conn->close();
             h3 {
                 font-size: 20px;
             }
-            .search-container { 
-                flex-direction: column; 
-                align-items: stretch; 
+            .search-container {
+                flex-direction: column;
+                align-items: stretch;
                 gap: 15px;
             }
-            .search-box { 
-                min-width: auto; 
+            .search-box {
+                min-width: auto;
             }
             .search-filters {
                 flex-direction: column;
                 gap: 10px;
             }
-            .form-row { 
-                grid-template-columns: 1fr; 
+            .form-row {
+                grid-template-columns: 1fr;
                 gap: 15px;
             }
             .form-button {
                 width: 100%;
                 text-align: center;
             }
-            
+
             .clients-table-container {
                 box-shadow: none;
                 border-radius: 0;
             }
-            
+
             table {
                 display: block;
                 width: 100%;
@@ -678,9 +676,9 @@ $conn->close();
                 </tr>
             </thead>
             <tbody id="clientsTableBody">
-            <?php 
+            <?php
             if ($resultClientes && $resultClientes->num_rows > 0) {
-                while($row = $resultClientes->fetch_assoc()) { 
+                while($row = $resultClientes->fetch_assoc()) {
             ?>
             <tr data-id="<?php echo $row['idCliente']; ?>"
                 data-nombre="<?php echo htmlspecialchars($row['nombres'] . ' ' . $row['apellidos']); ?>"
@@ -695,7 +693,7 @@ $conn->close();
                 <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
                 <td data-label="Tipo Doc." class="tipo-doc-cell">
                     <?php
-                    // Display 'Indocumentado' if the value from the database is 'indocumentado'
+                    // Muestra 'Indocumentado' si el valor de la base de datos es 'indocumentado'
                     if (strtolower($row['tipoDocumento']) === 'indocumentado') {
                         echo 'Indocumentado';
                     } else {
@@ -712,14 +710,14 @@ $conn->close();
                             <?php echo $row['activo'] ? 'Activo' : 'Inactivo'; ?>
                         </span>
                         <a href="editar_cliente.php?id=<?php echo $row['idCliente']; ?>" class="btn btn-edit">Editar</a>
-                        <a href="?toggle=<?php echo $row['idCliente']; ?>" 
+                        <a href="?toggle=<?php echo $row['idCliente']; ?>"
                            class="btn <?php echo $row['activo'] ? 'btn-deactivate' : 'btn-activate'; ?>">
                            <?php echo $row['activo'] ? 'Desactivar' : 'Activar'; ?>
                         </a>
                     </div>
                 </td>
             </tr>
-            <?php 
+            <?php
                 }
             } else {
                 echo "<tr><td colspan='8'>No se encontraron clientes.</td></tr>";
@@ -761,17 +759,17 @@ $conn->close();
             const tableBody = document.getElementById('clientsTableBody');
             const noResults = document.getElementById('noResults');
             const table = document.getElementById('clientsTable');
-            
+
             let allRows = Array.from(tableBody.querySelectorAll('tr'));
             const totalRows = allRows.length;
-            
+
             // Función para resaltar texto
             function highlightText(text, search) {
                 if (!search) return text;
                 const regex = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
                 return text.replace(regex, '<span class="highlight">$1</span>');
             }
-            
+
             // Función para limpiar highlights
             function clearHighlights() {
                 document.querySelectorAll('.highlight').forEach(el => {
@@ -779,16 +777,16 @@ $conn->close();
                     parent.innerHTML = parent.textContent;
                 });
             }
-            
+
             // Función para filtrar y ordenar
             function filterAndSort() {
                 const searchTerm = searchInput.value.toLowerCase().trim();
                 const filterType = filterBy.value;
                 const statusFilterValue = statusFilter.value;
                 const sortType = sortBy.value;
-                
+
                 clearHighlights();
-                
+
                 // Filtrar filas
                 let visibleRows = allRows.filter(row => {
                     // Filtro de estado
@@ -797,10 +795,10 @@ $conn->close();
                         if (statusFilterValue === 'active' && !isActive) return false;
                         if (statusFilterValue === 'inactive' && isActive) return false;
                     }
-                    
+
                     // Filtro de búsqueda
                     if (!searchTerm) return true;
-                    
+
                     let searchText = '';
                     switch(filterType) {
                         case 'nombre':
@@ -821,10 +819,10 @@ $conn->close();
                         default:
                             searchText = `${row.dataset.nombre} ${row.dataset.documento} ${row.dataset.direccion} ${row.dataset.telefono} ${row.dataset.estado}`.toLowerCase();
                     }
-                    
+
                     return searchText.includes(searchTerm);
                 });
-                
+
                 // Ordenar filas
                 visibleRows.sort((a, b) => {
                     switch(sortType) {
@@ -840,10 +838,10 @@ $conn->close();
                             return parseInt(a.dataset.id) - parseInt(b.dataset.id);
                     }
                 });
-                
+
                 // Limpiar tabla
                 tableBody.innerHTML = '';
-                
+
                 // Mostrar resultados o mensaje de "no encontrado"
                 if (visibleRows.length === 0) {
                     table.style.display = 'none';
@@ -851,7 +849,7 @@ $conn->close();
                 } else {
                     table.style.display = 'table';
                     noResults.style.display = 'none';
-                    
+
                     // Agregar filas filtradas y resaltar texto
                     visibleRows.forEach(row => {
                         if (searchTerm) {
@@ -883,14 +881,14 @@ $conn->close();
                         tableBody.appendChild(row);
                     });
                 }
-                
+
                 // Actualizar estadísticas
                 updateStats(visibleRows.length, searchTerm);
-                
+
                 // Mostrar/ocultar botón de limpiar
                 clearSearch.style.display = searchTerm ? 'block' : 'none';
             }
-            
+
             // Función para actualizar estadísticas
             function updateStats(visible, searchTerm) {
                 if (searchTerm || statusFilter.value !== 'all') {
@@ -900,21 +898,21 @@ $conn->close();
                     searchStats.style.display = 'none';
                 }
             }
-            
+
             // Event listeners
             searchInput.addEventListener('input', filterAndSort);
             filterBy.addEventListener('change', filterAndSort);
             statusFilter.addEventListener('change', filterAndSort);
             sortBy.addEventListener('change', filterAndSort);
-            
+
             clearSearch.addEventListener('click', function() {
                 searchInput.value = '';
                 filterAndSort();
                 searchInput.focus();
             });
-            
+
             searchInput.focus();
-            
+
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                     e.preventDefault();
