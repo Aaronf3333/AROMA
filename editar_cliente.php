@@ -39,7 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nombres = trim($_POST['nombres']);
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = trim($_POST['numeroDocumento']);
+    
+    // CORRECCIÓN: Verificar si la clave existe antes de usarla y manejar el trim() con un valor no-null
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
 
@@ -71,6 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmtUpdate->close();
     $conn->close();
+    
+    // CORRECCIÓN: La redirección se ejecuta después de que todo el código de PHP ha terminado de procesarse sin errores
     header("Location: clientes.php");
     exit();
 }
