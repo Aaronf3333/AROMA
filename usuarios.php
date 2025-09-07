@@ -21,13 +21,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
     $contrasena = $_POST['contrasena'];
     $idRol = intval($_POST['idRol']);
 
+    // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
+    if ($tipoDocumento === 'IND') {
+        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
+        $numeroDocumento = ''; // Asegurar que el numero de documento esté vacío si es indocumentado
+    } else {
+        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
+    }
+
     $conn->begin_transaction();
 
     try {
         $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono) 
                        VALUES (?, ?, ?, ?, ?, ?)";
         $stmtPersona = $conn->prepare($sqlPersona);
-        $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
+        $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
         $stmtPersona->execute();
 
         $idPersona = $conn->insert_id;
@@ -65,6 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $telefono = $_POST['telefono'];
     $idRol = intval($_POST['idRol']);
 
+    // Convertir a minúsculas si el tipo de documento es "IND" (Indocumentado)
+    if ($tipoDocumento === 'IND') {
+        $tipoDocumentoParaBD = 'indocumentado'; // Se guarda en minúsculas en la BD
+        $numeroDocumento = ''; // Asegurar que el numero de documento esté vacío si es indocumentado
+    } else {
+        $tipoDocumentoParaBD = $tipoDocumento; // Usar el valor tal cual para DNI/CE
+    }
+
     $conn->begin_transaction();
 
     try {
@@ -85,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
         // Actualizar persona
         $sqlUpdatePersona = "UPDATE persona SET nombres = ?, apellidos = ?, tipoDocumento = ?, numeroDocumento = ?, direccion = ?, telefono = ? WHERE idPersona = ?";
         $stmtPersona = $conn->prepare($sqlUpdatePersona);
-        $stmtPersona->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono, $idPersona);
+        $stmtPersona->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono, $idPersona);
         $stmtPersona->execute();
 
         $conn->commit();
@@ -804,7 +820,16 @@ input:disabled {
                                     </td>
                                     <td>
                                         <div class="user-info">
-                                            <div class="user-name"><?php echo htmlspecialchars($row['tipoDocumento']); ?></div>
+                                            <div class="user-name">
+                                                <?php
+                                                // Mostrar "Indocumentado" si el valor en BD es 'indocumentado'
+                                                if ($row['tipoDocumento'] === 'indocumentado') {
+                                                    echo 'Indocumentado';
+                                                } else {
+                                                    echo htmlspecialchars($row['tipoDocumento']);
+                                                }
+                                                ?>
+                                            </div>
                                             <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento']); ?></div>
                                         </div>
                                     </td>
@@ -1055,6 +1080,21 @@ function hideToast(button) {
 function abrirModal(tipo) {
     if (tipo === 'nuevo') {
         currentModal = document.getElementById('modalNuevo');
+        
+        // Resetear el formulario del modal "Nuevo"
+        const form = currentModal.querySelector('form');
+        if (form) {
+            form.reset();
+        }
+        
+        // Asegurarse de que el campo numeroDocumento esté habilitado y requerido por defecto
+        const nuevoTipoDocumentoSelect = document.getElementById('nuevo_tipoDocumento');
+        const nuevoNumeroDocumentoInput = document.getElementById('nuevo_numeroDocumento');
+        nuevoNumeroDocumentoInput.placeholder = 'Ingrese el número';
+        nuevoNumeroDocumentoInput.disabled = false;
+        nuevoNumeroDocumentoInput.setAttribute('required', 'required');
+        nuevoTipoDocumentoSelect.value = ''; // Limpiar la selección si es necesario
+
         currentModal.classList.add('show');
         document.body.style.overflow = 'hidden';
 
@@ -1075,7 +1115,8 @@ function abrirModalEditar(userData) {
     document.getElementById('edit_idUsuario').value = userData.idUsuario;
     document.getElementById('edit_nombres').value = userData.nombres;
     document.getElementById('edit_apellidos').value = userData.apellidos;
-    document.getElementById('edit_tipoDocumento').value = userData.tipoDocumento;
+    // Si el tipo de documento en BD es 'indocumentado', mostrar 'IND' en el select
+    document.getElementById('edit_tipoDocumento').value = (userData.tipoDocumento === 'indocumentado' ? 'IND' : userData.tipoDocumento);
     document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento;
     document.getElementById('edit_direccion').value = userData.direccion;
     document.getElementById('edit_telefono').value = userData.telefono;
@@ -1084,7 +1125,7 @@ function abrirModalEditar(userData) {
     document.getElementById('edit_idRol').value = userData.idRol;
     
     // Aplicar la lógica de validación al abrir el modal de edición
-    toggleDocumentoRequired('edit', userData.tipoDocumento);
+    toggleDocumentoRequired('edit', document.getElementById('edit_tipoDocumento').value);
 
     currentModal.classList.add('show');
     document.body.style.overflow = 'hidden';
@@ -1099,6 +1140,13 @@ function cerrarModal() {
         const form = currentModal.querySelector('form');
         if (form) {
             form.reset();
+            // Asegurarse de resetear también el estado del campo numeroDocumento si es el modal de Nuevo
+            if (currentModal.id === 'modalNuevo') {
+                const nuevoNumeroDocumentoInput = document.getElementById('nuevo_numeroDocumento');
+                nuevoNumeroDocumentoInput.placeholder = 'Ingrese el número';
+                nuevoNumeroDocumentoInput.disabled = false;
+                nuevoNumeroDocumentoInput.setAttribute('required', 'required');
+            }
         }
         
         currentModal = null;
