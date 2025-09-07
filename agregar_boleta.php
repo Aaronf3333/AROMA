@@ -39,6 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $total = 0;
     $detalleProductos = [];
 
+    // **NUEVAS VARIABLES para capturar los datos del cliente del formulario**
+    $clienteNombre = isset($_POST['cliente_nombre']) ? htmlspecialchars($_POST['cliente_nombre']) : 'Cliente Genérico';
+    $clienteTipoDoc = isset($_POST['cliente_tipodoc']) ? htmlspecialchars($_POST['cliente_tipodoc']) : 'DNI';
+    $clienteNumeroDoc = isset($_POST['cliente_numerodoc']) ? htmlspecialchars($_POST['cliente_numerodoc']) : '-----';
+
     // Validaciones iniciales
     if ($idCliente === null || empty($productosSeleccionados)) {
         $_SESSION['mensaje'] = "Error: Por favor, selecciona un cliente y al menos un producto.";
@@ -47,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Lógica modificada: Ahora solo se procesan los productos con cantidad > 0
     foreach ($productosSeleccionados as $idProd => $cantData) {
         $cantidad = isset($cantData['cantidad']) ? floatval($cantData['cantidad']) : 0;
         $precioUnitario = isset($cantData['precioUnitario']) ? floatval($cantData['precioUnitario']) : 0;
@@ -63,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Validación de que al menos un producto fue seleccionado correctamente
     if (empty($detalleProductos) || $total <= 0) {
         $_SESSION['mensaje'] = "Error: La cantidad de un producto no puede ser cero o un valor no numérico.";
         $_SESSION['tipo'] = "warning";
@@ -134,10 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(5);
 
         // Info cliente (LÓGICA CORREGIDA AQUÍ)
-        $clienteNombre = "Cliente Genérico";
-        $clienteTipoDoc = "DNI";
-        $clienteNumeroDoc = "-----";
-
+        // Solo buscamos en la base de datos si NO es el cliente genérico (id != 0)
         if ($idCliente != 0) {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
@@ -635,7 +635,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-tipodoc="<?php echo htmlspecialchars($cli['tipoDocumento'] ?? 'DNI'); ?>" data-numerodoc="<?php echo htmlspecialchars($cli['numeroDocumento'] ?? ''); ?>">
                                     <label>
                                         <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
-                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento'] ?? 'N/A'); ?>)</span>
+                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['tipoDocumento'] ?? 'DNI') . ': ' . htmlspecialchars($cli['numeroDocumento'] ?? 'N/A'); ?>)</span>
                                     </label>
                                 </li>
                             <?php endwhile; ?>
@@ -760,7 +760,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     clienteTipoDocHidden.value = tipoDoc;
                     clienteNumeroDocHidden.value = numeroDoc;
 
-                    clienteSearchInput.value = `${nombre} (${tipoDoc}: ${numeroDoc})`;
+                    // Para el input visible, ajustamos el formato si es el cliente genérico
+                    if (id === "0") {
+                        clienteSearchInput.value = `${nombre} (${tipoDoc}: ${numeroDoc})`;
+                    } else {
+                        clienteSearchInput.value = `${nombre} (${numeroDoc})`;
+                    }
+                    
                     clienteList.classList.remove('show');
 
                     allClientes.forEach(li => li.classList.remove('selected'));
