@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
+    // Lógica modificada: Ahora solo se procesan los productos con cantidad > 0
     foreach ($productosSeleccionados as $idProd => $cantData) {
         $cantidad = isset($cantData['cantidad']) ? floatval($cantData['cantidad']) : 0;
         $precioUnitario = isset($cantData['precioUnitario']) ? floatval($cantData['precioUnitario']) : 0;
@@ -62,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
+    // Validación de que al menos un producto fue seleccionado correctamente
     if (empty($detalleProductos) || $total <= 0) {
         $_SESSION['mensaje'] = "Error: La cantidad de un producto no puede ser cero o un valor no numérico.";
         $_SESSION['tipo'] = "warning";
@@ -131,10 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, 'Fecha: ' . $fechaEmision, 0, 1, 'C');
         $pdf->Ln(5);
 
-        // Info cliente
+        // Info cliente (LÓGICA MODIFICADA AQUÍ)
         if ($idCliente == 0) {
-            $clienteNombre = "Cliente";
-            $clienteDoc = "DNI: -----";
+            $clienteNombre = "Cliente Genérico";
+            $clienteTipoDoc = "DNI";
+            $clienteNumeroDoc = "-----";
         } else {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
@@ -144,16 +147,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
             $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-            $clienteDoc = $cliente['tipoDocumento'] . ': ' . htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
+            $clienteTipoDoc = htmlspecialchars($cliente['tipoDocumento'] ?? 'DNI');
+            $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
+            if (empty($clienteNumeroDoc)) {
+                $clienteNumeroDoc = '-----';
+            }
         }
-
+        
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 7);
         $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L');
+        $pdf->Cell($anchoEfectivo, 4, $clienteTipoDoc . ': ' . $clienteNumeroDoc, 0, 1, 'L');
         if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
             $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
@@ -619,7 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <ul id="clienteList" class="dropdown-list">
                             <li class="dropdown-item" data-id="0" data-nombre="Cliente" data-dni="-----">
                                 <label>
-                                    <span class="cliente-nombre">Cliente</span>
+                                    <span class="cliente-nombre">Cliente Genérico</span>
                                     <span class="cliente-doc">(-----)</span>
                                 </label>
                             </li>
