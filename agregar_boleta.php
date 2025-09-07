@@ -150,13 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $clienteTipoDoc = htmlspecialchars($cliente['tipoDocumento'] ?? 'DNI');
             $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '');
             
-            // Si el DNI está vacío en la base de datos, lo mostramos como -----
-            if (empty($clienteNumeroDoc)) {
+            if (empty($clienteNumeroDoc) || strtolower($clienteTipoDoc) === 'indocumentado') {
                 $clienteNumeroDoc = '-----';
+                $clienteTipoDoc = 'DNI'; 
             }
         } else {
-            // Este es el cliente genérico. Usamos las variables del formulario.
-            // Y validamos si el número de documento está vacío, lo que debería pasar.
             if (empty($clienteNumeroDoc)) {
                 $clienteNumeroDoc = '-----';
             }
