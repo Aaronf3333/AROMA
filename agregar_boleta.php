@@ -50,17 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $validacionExitosa = true;
     foreach ($productosSeleccionados as $idProd => $cantData) {
         // Validación mejorada para la cantidad y el precio
-        if (!isset($cantData['cantidad']) || !is_numeric($cantData['cantidad']) || floatval($cantData['cantidad']) <= 0) {
-            $validacionExitosa = false;
-            break; // Salir del bucle si se encuentra un valor inválido
-        }
-        
-        $cantidad = floatval($cantData['cantidad']);
-        $precioUnitario = floatval($cantData['precioUnitario']);
-        
+        $cantidad = isset($cantData['cantidad']) ? floatval($cantData['cantidad']) : 0;
+        $precioUnitario = isset($cantData['precioUnitario']) ? floatval($cantData['precioUnitario']) : 0;
+
         if ($cantidad <= 0 || $precioUnitario <= 0) {
             $validacionExitosa = false;
-            break;
+            break; // Salir del bucle si se encuentra un valor inválido
         }
         
         $subtotal = $cantidad * $precioUnitario;
@@ -777,7 +772,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     const quantityInput = item.querySelector('.product-quantity');
                     const productName = checkbox.dataset.nombre;
                     const productPrice = parseFloat(checkbox.dataset.precio);
+                    
+                    // Asegurar que la cantidad sea un número válido y mayor a 0
                     const quantity = parseInt(quantityInput.value) || 0;
+                    if (quantity <= 0) {
+                        quantityInput.value = 1;
+                    }
+                    
                     const subtotal = productPrice * quantity;
                     
                     if (quantity > 0) {
@@ -800,8 +801,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const montoPagado = parseFloat(montoPagadoInput.value) || 0;
                 let cambio = montoPagado - total;
                 const clienteSeleccionado = idClienteHidden.value;
+                const hasSelectedProducts = productsList.querySelectorAll('.product-item.selected').length > 0;
 
-                if (montoPagado >= total && total > 0 && clienteSeleccionado) {
+                if (montoPagado >= total && total > 0 && clienteSeleccionado && hasSelectedProducts) {
                     cambioAmountSpan.textContent = `S/. ${cambio.toFixed(2)}`;
                     submitBtn.disabled = false;
                 } else {
@@ -837,6 +839,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             productsList.addEventListener('input', (event) => {
                 if (event.target.classList.contains('product-quantity')) {
+                    // Asegurar que el valor sea un número válido al escribir
+                    let quantity = parseInt(event.target.value);
+                    if (isNaN(quantity) || quantity < 1) {
+                        event.target.value = 1;
+                    }
                     updateTotal();
                 }
             });
@@ -844,12 +851,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             montoPagadoInput.addEventListener('input', updatePaymentDetails);
 
             formBoleta.addEventListener('submit', function(e) {
-                const selectedProductsCount = productsList.querySelectorAll('.product-item.selected').length;
+                const selectedProducts = productsList.querySelectorAll('.product-item.selected');
                 const clienteSeleccionado = idClienteHidden.value;
-                const totalCalculated = parseFloat(totalAmountSpan.textContent.replace('S/. ', '')) || 0;
-                const montoPagadoValue = parseFloat(montoPagadoInput.value) || 0;
+                let totalIsValid = true;
 
-                if (selectedProductsCount === 0) {
+                // Validación final de cantidades antes de enviar el formulario
+                selectedProducts.forEach(item => {
+                    const quantityInput = item.querySelector('.product-quantity');
+                    const quantity = parseInt(quantityInput.value);
+                    if (isNaN(quantity) || quantity <= 0) {
+                        totalIsValid = false;
+                    }
+                });
+
+                if (!totalIsValid) {
+                    e.preventDefault();
+                    showToast('Por favor, revisa que la cantidad de los productos sea un número válido mayor a cero.', 'warning');
+                    return;
+                }
+
+                if (selectedProducts.length === 0) {
                     e.preventDefault();
                     showToast('Por favor, selecciona al menos un producto.', 'warning');
                     return;
@@ -861,7 +882,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return;
                 }
 
-                // Validación final en el cliente antes de enviar
+                const totalCalculated = parseFloat(totalAmountSpan.textContent.replace('S/. ', '')) || 0;
+                const montoPagadoValue = parseFloat(montoPagadoInput.value) || 0;
+
                 if (totalCalculated <= 0) {
                     e.preventDefault();
                     showToast('Error: El total de la venta debe ser mayor a S/. 0.00.', 'warning');
