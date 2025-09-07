@@ -144,7 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
             $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-            // Corregimos el problema de htmlspecialchars
             $clienteDoc = $cliente['tipoDocumento'] . ': ' . htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
         }
 
@@ -152,12 +151,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 7);
-        $pdf->Cell($anchoEfectivo, 4, utf8_decode($clienteNombre), 0, 1, 'L');
+        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L'); // Línea 155 - Eliminado utf8_decode()
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo, 4, utf8_decode($clienteDoc), 0, 1, 'L');
+        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L'); // Línea 157 - Eliminado utf8_decode()
         if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, utf8_decode('Dir: ' . $cliente['direccion']), 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L'); // Línea 160 - Eliminado utf8_decode()
         }
         if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
             $pdf->Ln(1);
@@ -185,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
-            $pdf->Cell($anchoProducto, 6, utf8_decode($nombreProducto), 1, 0, 'L', $alternar);
+            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar); // Línea 188 - Eliminado utf8_decode()
             $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
             $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
             $pdf->Cell($anchoSubtotal, 6, 'S/ ' . number_format($data['cantidad'] * $data['precioUnitario'], 2), 1, 1, 'R', $alternar);
@@ -222,14 +221,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(6);
         $pdf->SetFont('Arial', 'I', 7);
         $pdf->SetTextColor(100, 100, 100);
-        $pdf->Cell($anchoEfectivo, 4, utf8_decode('¡Gracias por su compra!'), 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, '¡Gracias por su compra!', 0, 1, 'C'); // Línea 225 - Eliminado utf8_decode()
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, 'www.aromasac.com', 0, 1, 'C');
         $pdf->Ln(3);
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->SetTextColor(170, 170, 170);
-        $pdf->Cell($anchoEfectivo, 4, utf8_decode('Esta nota no tiene valor tributario.'), 0, 1, 'C');
-        $pdf->Cell($anchoEfectivo, 4, utf8_decode('Solicite su Boleta de Venta o Factura.'), 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, 'Esta nota no tiene valor tributario.', 0, 1, 'C'); // Línea 231 - Eliminado utf8_decode()
+        $pdf->Cell($anchoEfectivo, 4, 'Solicite su Boleta de Venta o Factura.', 0, 1, 'C'); // Línea 232 - Eliminado utf8_decode()
 
         $pdfContent = $pdf->Output('S');
 
