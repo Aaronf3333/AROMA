@@ -375,7 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .form-group {
             margin-bottom: 20px;
-            width: 100%; /* Aseguramos que ocupe todo el ancho disponible */
+            width: 100%; /* Ajuste para que ocupe el 100% del contenedor */
         }
         .form-label {
             display: block;
