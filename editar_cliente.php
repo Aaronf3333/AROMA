@@ -43,14 +43,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
 
+    // Corrección: Manejar el tipo de documento "Indocumentado"
+    if ($tipoDocumento === 'IND') {
+        $tipoDocumentoParaBD = 'indocumentado';
+        $numeroDocumentoParaBD = null; // Guardar NULL en la base de datos para el número de documento
+    } else {
+        $tipoDocumentoParaBD = $tipoDocumento;
+        $numeroDocumentoParaBD = $numeroDocumento;
+    }
+
     // Actualizar Persona
-    $sqlUpdate = "UPDATE persona p 
+    $sqlUpdate = "UPDATE persona p
                   JOIN cliente c ON p.idPersona = c.idPersona
                   SET p.nombres = ?, p.apellidos = ?, p.tipoDocumento = ?, p.numeroDocumento = ?, p.direccion = ?, p.telefono = ?
                   WHERE c.idCliente = ?";
     $stmtUpdate = $conn->prepare($sqlUpdate);
-    $stmtUpdate->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono, $idCliente);
-    
+    // Nota: El tipo de parámetro para numeroDocumento sigue siendo 's' (string) aunque el valor sea NULL
+    $stmtUpdate->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumentoParaBD, $direccion, $telefono, $idCliente);
+
     if ($stmtUpdate->execute()) {
         $_SESSION['mensaje'] = "Cliente actualizado correctamente.";
         $_SESSION['tipo'] = "success";
@@ -58,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['mensaje'] = "Error al actualizar cliente: " . $conn->error;
         $_SESSION['tipo'] = "error";
     }
-    
+
     $stmtUpdate->close();
     $conn->close();
     header("Location: clientes.php");
@@ -94,6 +104,8 @@ $conn->close();
             --button-bg: #3b3b98;
             --button-hover: #2d2d7c;
             --link-bg: #7f8c8d;
+            --error-color: #c0392b;
+            --warning-color: #f39c12;
         }
 
         body {
@@ -152,6 +164,13 @@ $conn->close();
             border-color: var(--primary-color);
             outline: none;
             box-shadow: 0 0 5px rgba(59, 59, 152, 0.2);
+        }
+
+        /* Estilo para campos deshabilitados */
+        input[disabled] {
+            background-color: #f1f1f1;
+            cursor: not-allowed;
+            color: #999;
         }
 
         /* Botones */
@@ -246,30 +265,31 @@ $conn->close();
     <form method="POST">
         <div class="form-group">
             <label for="nombres">Nombres:</label>
-            <input type="text" id="nombres" name="nombres" value="<?php echo htmlspecialchars($cliente['nombres']); ?>" placeholder="Nombres" required>
+            <input type="text" id="nombres" name="nombres" value="<?php echo htmlspecialchars($cliente['nombres'] ?? ''); ?>" placeholder="Nombres" required>
         </div>
         <div class="form-group">
             <label for="apellidos">Apellidos:</label>
-            <input type="text" id="apellidos" name="apellidos" value="<?php echo htmlspecialchars($cliente['apellidos']); ?>" placeholder="Apellidos" required>
+            <input type="text" id="apellidos" name="apellidos" value="<?php echo htmlspecialchars($cliente['apellidos'] ?? ''); ?>" placeholder="Apellidos" required>
         </div>
         <div class="form-group">
             <label for="tipoDocumento">Tipo de Documento:</label>
             <select id="tipoDocumento" name="tipoDocumento" required>
-                <option value="DNI" <?php if($cliente['tipoDocumento']=='DNI') echo 'selected'; ?>>DNI</option>
-                <option value="CE" <?php if($cliente['tipoDocumento']=='CE') echo 'selected'; ?>>CE</option>
+                <option value="DNI" <?php if(($cliente['tipoDocumento'] ?? '') === 'DNI') echo 'selected'; ?>>DNI</option>
+                <option value="CE" <?php if(($cliente['tipoDocumento'] ?? '') === 'CE') echo 'selected'; ?>>CE</option>
+                <option value="IND" <?php if(($cliente['tipoDocumento'] ?? '') === 'indocumentado') echo 'selected'; ?>>Indocumentado</option>
             </select>
         </div>
         <div class="form-group">
             <label for="numeroDocumento">Número de Documento:</label>
-            <input type="text" id="numeroDocumento" name="numeroDocumento" value="<?php echo htmlspecialchars($cliente['numeroDocumento']); ?>" placeholder="Número de documento" required>
+            <input type="text" id="numeroDocumento" name="numeroDocumento" value="<?php echo htmlspecialchars($cliente['numeroDocumento'] ?? ''); ?>" placeholder="Número de documento">
         </div>
         <div class="form-group">
             <label for="direccion">Dirección:</label>
-            <input type="text" id="direccion" name="direccion" value="<?php echo htmlspecialchars($cliente['direccion']); ?>" placeholder="Dirección">
+            <input type="text" id="direccion" name="direccion" value="<?php echo htmlspecialchars($cliente['direccion'] ?? ''); ?>" placeholder="Dirección">
         </div>
         <div class="form-group">
             <label for="telefono">Teléfono:</label>
-            <input type="text" id="telefono" name="telefono" value="<?php echo htmlspecialchars($cliente['telefono']); ?>" placeholder="Teléfono">
+            <input type="text" id="telefono" name="telefono" value="<?php echo htmlspecialchars($cliente['telefono'] ?? ''); ?>" placeholder="Teléfono">
         </div>
         <button type="submit">Actualizar Cliente</button>
         <a href="clientes.php" class="back-link">Volver a Clientes</a>
@@ -277,5 +297,37 @@ $conn->close();
 
 </main>
 <?php include(__DIR__ . "/includes/footer.php"); ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoDocumentoSelect = document.getElementById('tipoDocumento');
+    const numeroDocumentoInput = document.getElementById('numeroDocumento');
+
+    // Función para alternar el estado del campo de documento
+    function toggleDocumentoField() {
+        if (tipoDocumentoSelect.value === 'IND') {
+            numeroDocumentoInput.value = '';
+            numeroDocumentoInput.placeholder = 'No requerido';
+            numeroDocumentoInput.disabled = true;
+            numeroDocumentoInput.removeAttribute('required');
+        } else {
+            numeroDocumentoInput.placeholder = 'Número de documento';
+            numeroDocumentoInput.disabled = false;
+            numeroDocumentoInput.setAttribute('required', 'required');
+        }
+    }
+
+    // Escuchar el cambio en el select
+    tipoDocumentoSelect.addEventListener('change', toggleDocumentoField);
+    
+    // Ejecutar al cargar la página para reflejar el estado actual
+    toggleDocumentoField();
+
+    // Validación de números en el campo de documento
+    numeroDocumentoInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+});
+</script>
 </body>
 </html>
