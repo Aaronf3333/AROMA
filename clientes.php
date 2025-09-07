@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     // Aseguramos que la clave exista, si no, es una cadena vacía por defecto
     $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
 
-    // CORRECCIÓN CLAVE: Si el numeroDocumento está vacío, lo convertimos a NULL
+    // Si el numeroDocumento está vacío, lo convertimos a NULL
     if (empty($numeroDocumento)) {
         $numeroDocumento = NULL;
     }
