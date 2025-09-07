@@ -517,7 +517,6 @@ if (isset($_SESSION['mensaje'])) {
                 display: none;
             }
         }
-
     </style>
 </head>
 <body>
