@@ -20,17 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $nombres = trim($_POST['nombres']);
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
-
-    // --- Lógica adaptada del archivo de usuarios ---
-    if ($tipoDocumento === 'IND') {
-        $tipoDocumentoParaBD = 'indocumentado'; 
-        $numeroDocumento = ''; 
-    } else {
-        $tipoDocumentoParaBD = $tipoDocumento; 
-        $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
-    }
-    // --- Fin de la lógica adaptada ---
-
+    $numeroDocumento = trim($_POST['numeroDocumento']);
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
 
@@ -39,9 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
 
     try {
         // Verificar si la persona ya existe en la tabla `Persona`
+        // Se excluye la validación de documento si el tipo es 'indocumentado'
         $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
         $stmtCheck = $conn->prepare($checkSql);
-        $stmtCheck->bind_param("ss", $tipoDocumentoParaBD, $numeroDocumento);
+        $stmtCheck->bind_param("ss", $tipoDocumento, $numeroDocumento);
         $stmtCheck->execute();
         $resultCheck = $stmtCheck->get_result();
         $rowCheck = $resultCheck->fetch_assoc();
@@ -72,9 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         } else {
             // Si la persona no existe, insertarla primero en la tabla `Persona`
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
-                           VALUES (?, ?, ?, ?, ?, ?)";
+                            VALUES (?, ?, ?, ?, ?, ?)";
             $stmtPersona = $conn->prepare($sqlPersona);
-            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumentoParaBD, $numeroDocumento, $direccion, $telefono);
+            $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
             $stmtPersona->execute();
 
             // Obtener el ID de la persona recién insertada (MySQL)
@@ -582,331 +573,346 @@ $conn->close();
     </style>
 </head>
 <body>
-    <?php include(__DIR__ . "/includes/header.php"); ?>
+<?php include(__DIR__ . "/includes/header.php"); ?>
 
-    <main>
-        <h2>Gestión de Clientes</h2>
+<main>
+    <h2>Gestión de Clientes</h2>
 
-        <?php if($mensaje): ?>
-        <div id="toast" class="<?php echo htmlspecialchars($tipoMensaje); ?>">
-            <?php echo htmlspecialchars($mensaje); ?>
-        </div>
-        <script>
-            const toast = document.getElementById('toast');
-            toast.classList.add('show');
-            setTimeout(() => { toast.classList.remove('show'); }, 4000);
-        </script>
-        <?php endif; ?>
+    <?php if($mensaje): ?>
+    <div id="toast" class="<?php echo htmlspecialchars($tipoMensaje); ?>">
+        <?php echo htmlspecialchars($mensaje); ?>
+    </div>
+    <script>
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 4000);
+    </script>
+    <?php endif; ?>
 
-        <div class="add-client-form">
-            <h3>Agregar Nuevo Cliente</h3>
-            <form method="POST">
-                <div class="form-row">
-                    <div class="form-group">
-                        <input type="text" name="nombres" placeholder="Nombres" required class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <input type="text" name="apellidos" placeholder="Apellidos" required class="form-input">
-                    </div>
+    <div class="add-client-form">
+        <h3>Agregar Nuevo Cliente</h3>
+        <form method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <input type="text" name="nombres" placeholder="Nombres" required class="form-input">
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <select name="tipoDocumento" required class="form-input">
-                            <option value="">Seleccione tipo de documento</option>
-                            <option value="DNI">DNI</option>
-                            <option value="CE">CE</option>
-                            <option value="IND">Indocumentado</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <input type="text" name="numeroDocumento" placeholder="Número de documento" class="form-input">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <input type="text" name="direccion" placeholder="Dirección" class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <input type="text" name="telefono" placeholder="Teléfono" class="form-input">
-                    </div>
-                </div>
-                <button type="submit" class="form-button">Agregar Cliente</button>
-            </form>
-        </div>
-
-        <div class="search-section">
-            <div class="search-container">
-                <div class="search-box">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Buscar por nombre, documento, dirección, teléfono..." autocomplete="off">
-                    <span class="search-icon">🔍</span>
-                    <button class="clear-search" id="clearSearch">✕</button>
-                </div>
-                <div class="search-filters">
-                    <select id="filterBy" class="filter-select">
-                        <option value="all">Todos los campos</option>
-                        <option value="nombre">Nombre completo</option>
-                        <option value="documento">Documento</option>
-                        <option value="direccion">Dirección</option>
-                        <option value="telefono">Teléfono</option>
-                        <option value="estado">Estado</option>
-                    </select>
-                    <select id="statusFilter" class="filter-select">
-                        <option value="all">Todos los estados</option>
-                        <option value="active">Solo activos</option>
-                        <option value="inactive">Solo inactivos</option>
-                    </select>
-                    <select id="sortBy" class="filter-select">
-                        <option value="id-asc">Por ID (ascendente)</option>
-                        <option value="id-desc">Por ID (descendente)</option>
-                        <option value="nombre-asc">Por nombre A-Z</option>
-                        <option value="nombre-desc">Por nombre Z-A</option>
-                    </select>
+                <div class="form-group">
+                    <input type="text" name="apellidos" placeholder="Apellidos" required class="form-input">
                 </div>
             </div>
-            <div class="search-stats" id="searchStats"></div>
-        </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <select name="tipoDocumento" id="tipoDocumento" required class="form-input">
+                        <option value="">Seleccione tipo de documento</option>
+                        <option value="DNI">DNI</option>
+                        <option value="CE">CE</option>
+                        <option value="indocumentado">Indocumentado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <input type="text" name="numeroDocumento" id="numeroDocumento" placeholder="Número de documento" required class="form-input">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <input type="text" name="direccion" placeholder="Dirección" class="form-input">
+                </div>
+                <div class="form-group">
+                    <input type="text" name="telefono" placeholder="Teléfono" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="form-button">Agregar Cliente</button>
+        </form>
+    </div>
 
-        <div class="clients-table-container">
-            <table id="clientsTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombres</th>
-                        <th>Apellidos</th>
-                        <th>Tipo Doc.</th>
-                        <th>Número Doc.</th>
-                        <th>Dirección</th>
-                        <th>Teléfono</th>
-                        <th>Estado / Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="clientsTableBody">
-                    <?php
-                    if ($resultClientes && $resultClientes->num_rows > 0) {
-                        while($row = $resultClientes->fetch_assoc()) {
-                    ?>
-                    <tr data-id="<?php echo $row['idCliente']; ?>"
-                        data-nombre="<?php echo htmlspecialchars($row['nombres'] . ' ' . $row['apellidos']); ?>"
-                        data-nombres="<?php echo htmlspecialchars($row['nombres']); ?>"
-                        data-apellidos="<?php echo htmlspecialchars($row['apellidos']); ?>"
-                        data-documento="<?php echo htmlspecialchars($row['tipoDocumento'] . ' ' . $row['numeroDocumento']); ?>"
-                        data-direccion="<?php echo htmlspecialchars($row['direccion']); ?>"
-                        data-telefono="<?php echo htmlspecialchars($row['telefono']); ?>"
-                        data-estado="<?php echo $row['activo'] ? 'activo' : 'inactivo'; ?>">
-                        <td data-label="ID"><?php echo $row['idCliente']; ?></td>
-                        <td data-label="Nombres" class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
-                        <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
-                        <td data-label="Tipo Doc." class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
-                        <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
-                        <td data-label="Dirección" class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
-                        <td data-label="Teléfono" class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
-                        <td data-label="Estado / Acciones">
-                            <div class="action-buttons">
-                                <span class="status-badge <?php echo $row['activo'] ? 'status-active' : 'status-inactive'; ?>">
-                                    <?php echo $row['activo'] ? 'Activo' : 'Inactivo'; ?>
-                                </span>
-                                <a href="editar_cliente.php?id=<?php echo $row['idCliente']; ?>" class="btn btn-edit">Editar</a>
-                                <a href="?toggle=<?php echo $row['idCliente']; ?>"
-                                   class="btn <?php echo $row['activo'] ? 'btn-deactivate' : 'btn-activate'; ?>">
-                                    <?php echo $row['activo'] ? 'Desactivar' : 'Activar'; ?>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php
-                        }
-                    } else {
-                        echo "<tr><td colspan='8'>No se encontraron clientes.</td></tr>";
+    <div class="search-section">
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="Buscar por nombre, documento, dirección, teléfono..." autocomplete="off">
+                <span class="search-icon">🔍</span>
+                <button class="clear-search" id="clearSearch">✕</button>
+            </div>
+            <div class="search-filters">
+                <select id="filterBy" class="filter-select">
+                    <option value="all">Todos los campos</option>
+                    <option value="nombre">Nombre completo</option>
+                    <option value="documento">Documento</option>
+                    <option value="direccion">Dirección</option>
+                    <option value="telefono">Teléfono</option>
+                    <option value="estado">Estado</option>
+                </select>
+                <select id="statusFilter" class="filter-select">
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Solo activos</option>
+                    <option value="inactive">Solo inactivos</option>
+                </select>
+                <select id="sortBy" class="filter-select">
+                    <option value="id-asc">Por ID (ascendente)</option>
+                    <option value="id-desc">Por ID (descendente)</option>
+                    <option value="nombre-asc">Por nombre A-Z</option>
+                    <option value="nombre-desc">Por nombre Z-A</option>
+                </select>
+            </div>
+        </div>
+        <div class="search-stats" id="searchStats"></div>
+    </div>
+
+    <div class="clients-table-container">
+        <table id="clientsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombres</th>
+                    <th>Apellidos</th>
+                    <th>Tipo Doc.</th>
+                    <th>Número Doc.</th>
+                    <th>Dirección</th>
+                    <th>Teléfono</th>
+                    <th>Estado / Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="clientsTableBody">
+                <?php
+                if ($resultClientes && $resultClientes->num_rows > 0) {
+                    while($row = $resultClientes->fetch_assoc()) {
+                        ?>
+                        <tr data-id="<?php echo $row['idCliente']; ?>"
+                            data-nombre="<?php echo htmlspecialchars($row['nombres'] . ' ' . $row['apellidos']); ?>"
+                            data-nombres="<?php echo htmlspecialchars($row['nombres']); ?>"
+                            data-apellidos="<?php echo htmlspecialchars($row['apellidos']); ?>"
+                            data-documento="<?php echo htmlspecialchars($row['tipoDocumento'] . ' ' . $row['numeroDocumento']); ?>"
+                            data-direccion="<?php echo htmlspecialchars($row['direccion']); ?>"
+                            data-telefono="<?php echo htmlspecialchars($row['telefono']); ?>"
+                            data-estado="<?php echo $row['activo'] ? 'activo' : 'inactivo'; ?>">
+                            <td data-label="ID"><?php echo $row['idCliente']; ?></td>
+                            <td data-label="Nombres" class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
+                            <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
+                            <td data-label="Tipo Doc." class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
+                            <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
+                            <td data-label="Dirección" class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
+                            <td data-label="Teléfono" class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
+                            <td data-label="Estado / Acciones">
+                                <div class="action-buttons">
+                                    <span class="status-badge <?php echo $row['activo'] ? 'status-active' : 'status-inactive'; ?>">
+                                        <?php echo $row['activo'] ? 'Activo' : 'Inactivo'; ?>
+                                    </span>
+                                    <a href="editar_cliente.php?id=<?php echo $row['idCliente']; ?>" class="btn btn-edit">Editar</a>
+                                    <a href="?toggle=<?php echo $row['idCliente']; ?>"
+                                       class="btn <?php echo $row['activo'] ? 'btn-deactivate' : 'btn-activate'; ?>">
+                                        <?php echo $row['activo'] ? 'Desactivar' : 'Activar'; ?>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php
                     }
-                    ?>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="no-results" id="noResults">
-            <h3>😔 No se encontraron clientes</h3>
-            <p>Intenta con otros términos de búsqueda</p>
-        </div>
-
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const searchInput = document.getElementById('searchInput');
-                const clearSearch = document.getElementById('clearSearch');
-                const filterBy = document.getElementById('filterBy');
-                const statusFilter = document.getElementById('statusFilter');
-                const sortBy = document.getElementById('sortBy');
-                const searchStats = document.getElementById('searchStats');
-                const tableBody = document.getElementById('clientsTableBody');
-                const noResults = document.getElementById('noResults');
-                const table = document.getElementById('clientsTable');
-
-                let allRows = Array.from(tableBody.querySelectorAll('tr'));
-                const totalRows = allRows.length;
-
-                // Función para resaltar texto
-                function highlightText(text, search) {
-                    if (!search) return text;
-                    const regex = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                    return text.replace(regex, '<span class="highlight">$1</span>');
+                } else {
+                    echo "<tr><td colspan='8'>No se encontraron clientes.</td></tr>";
                 }
+                ?>
+            </tbody>
+        </table>
+    </div>
 
-                // Función para limpiar highlights
-                function clearHighlights() {
-                    document.querySelectorAll('.highlight').forEach(el => {
-                        el.outerHTML = el.innerHTML;
-                    });
+    <div class="no-results" id="noResults">
+        <h3>😔 No se encontraron clientes</h3>
+        <p>Intenta con otros términos de búsqueda</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearch = document.getElementById('clearSearch');
+            const filterBy = document.getElementById('filterBy');
+            const statusFilter = document.getElementById('statusFilter');
+            const sortBy = document.getElementById('sortBy');
+            const searchStats = document.getElementById('searchStats');
+            const tableBody = document.getElementById('clientsTableBody');
+            const noResults = document.getElementById('noResults');
+            const table = document.getElementById('clientsTable');
+
+            const tipoDocumentoSelect = document.getElementById('tipoDocumento');
+            const numeroDocumentoInput = document.getElementById('numeroDocumento');
+
+            // Lógica para que el número de documento sea opcional si es "indocumentado"
+            tipoDocumentoSelect.addEventListener('change', function() {
+                if (this.value === 'indocumentado') {
+                    numeroDocumentoInput.required = false;
+                    numeroDocumentoInput.placeholder = "Número de documento (Opcional)";
+                    numeroDocumentoInput.value = '';
+                } else {
+                    numeroDocumentoInput.required = true;
+                    numeroDocumentoInput.placeholder = "Número de documento";
                 }
+            });
+            
 
-                // Función para filtrar y ordenar
-                function filterAndSort() {
-                    const searchTerm = searchInput.value.toLowerCase().trim();
-                    const filterType = filterBy.value;
-                    const statusFilterValue = statusFilter.value;
-                    const sortType = sortBy.value;
+            let allRows = Array.from(tableBody.querySelectorAll('tr'));
+            const totalRows = allRows.length;
 
-                    clearHighlights();
+            // Función para resaltar texto
+            function highlightText(text, search) {
+                if (!search) return text;
+                const regex = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                return text.replace(regex, '<span class="highlight">$1</span>');
+            }
 
-                    // Filtrar filas
-                    let visibleRows = allRows.filter(row => {
-                        // Filtro de estado
-                        if (statusFilterValue !== 'all') {
-                            const isActive = row.dataset.estado === 'activo';
-                            if (statusFilterValue === 'active' && !isActive) return false;
-                            if (statusFilterValue === 'inactive' && isActive) return false;
-                        }
+            // Función para limpiar highlights
+            function clearHighlights() {
+                document.querySelectorAll('.highlight').forEach(el => {
+                    el.outerHTML = el.innerHTML;
+                });
+            }
 
-                        // Filtro de búsqueda
-                        if (!searchTerm) return true;
+            // Función para filtrar y ordenar
+            function filterAndSort() {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                const filterType = filterBy.value;
+                const statusFilterValue = statusFilter.value;
+                const sortType = sortBy.value;
 
-                        let searchText = '';
-                        switch(filterType) {
-                            case 'nombre':
-                                searchText = row.dataset.nombre.toLowerCase();
-                                break;
-                            case 'documento':
-                                searchText = row.dataset.documento.toLowerCase();
-                                break;
-                            case 'direccion':
-                                searchText = row.dataset.direccion.toLowerCase();
-                                break;
-                            case 'telefono':
-                                searchText = row.dataset.telefono.toLowerCase();
-                                break;
-                            case 'estado':
-                                searchText = row.dataset.estado.toLowerCase();
-                                break;
-                            default:
-                                searchText = `${row.dataset.nombre} ${row.dataset.documento} ${row.dataset.direccion} ${row.dataset.telefono} ${row.dataset.estado}`.toLowerCase();
-                        }
+                clearHighlights();
 
-                        return searchText.includes(searchTerm);
-                    });
+                // Filtrar filas
+                let visibleRows = allRows.filter(row => {
+                    // Filtro de estado
+                    if (statusFilterValue !== 'all') {
+                        const isActive = row.dataset.estado === 'activo';
+                        if (statusFilterValue === 'active' && !isActive) return false;
+                        if (statusFilterValue === 'inactive' && isActive) return false;
+                    }
 
-                    // Ordenar filas
-                    visibleRows.sort((a, b) => {
-                        switch(sortType) {
-                            case 'id-asc':
-                                return parseInt(a.dataset.id) - parseInt(b.dataset.id);
-                            case 'id-desc':
-                                return parseInt(b.dataset.id) - parseInt(a.dataset.id);
-                            case 'nombre-asc':
-                                return a.dataset.nombre.localeCompare(b.dataset.nombre);
-                            case 'nombre-desc':
-                                return b.dataset.nombre.localeCompare(a.dataset.nombre);
-                            default:
-                                return parseInt(a.dataset.id) - parseInt(b.dataset.id);
-                        }
-                    });
+                    // Filtro de búsqueda
+                    if (!searchTerm) return true;
 
-                    // Limpiar tabla
-                    tableBody.innerHTML = '';
-                    // Mostrar resultados o mensaje de "no encontrado"
-                    if (visibleRows.length === 0) {
-                        table.style.display = 'none';
-                        noResults.style.display = 'block';
-                    } else {
-                        table.style.display = 'table';
-                        noResults.style.display = 'none';
-                        
-                        // Agregar filas filtradas y resaltar texto
-                        visibleRows.forEach(row => {
-                            if (searchTerm) {
-                                if (filterType === 'nombre') {
-                                    const nombresCell = row.querySelector('.nombres-cell');
-                                    const apellidosCell = row.querySelector('.apellidos-cell');
-                                    nombresCell.innerHTML = highlightText(nombresCell.textContent, searchTerm);
-                                    apellidosCell.innerHTML = highlightText(apellidosCell.textContent, searchTerm);
-                                } else if (filterType === 'documento') {
-                                    const tipoDocCell = row.querySelector('.tipo-doc-cell');
-                                    const numeroDocCell = row.querySelector('.numero-doc-cell');
-                                    tipoDocCell.innerHTML = highlightText(tipoDocCell.textContent, searchTerm);
-                                    numeroDocCell.innerHTML = highlightText(numeroDocCell.textContent, searchTerm);
-                                } else if (filterType === 'direccion') {
-                                    const direccionCell = row.querySelector('.direccion-cell');
-                                    direccionCell.innerHTML = highlightText(direccionCell.textContent, searchTerm);
-                                } else if (filterType === 'telefono') {
-                                    const telefonoCell = row.querySelector('.telefono-cell');
-                                    telefonoCell.innerHTML = highlightText(telefonoCell.textContent, searchTerm);
-                                } else if (filterType === 'all') {
-                                    ['nombres-cell', 'apellidos-cell', 'tipo-doc-cell', 'numero-doc-cell', 'direccion-cell', 'telefono-cell'].forEach(className => {
-                                        const cell = row.querySelector(`.${className}`);
-                                        if (cell) {
-                                            cell.innerHTML = highlightText(cell.textContent, searchTerm);
-                                        }
-                                    });
-                                }
+                    let searchText = '';
+                    switch(filterType) {
+                        case 'nombre':
+                            searchText = row.dataset.nombre.toLowerCase();
+                            break;
+                        case 'documento':
+                            searchText = row.dataset.documento.toLowerCase();
+                            break;
+                        case 'direccion':
+                            searchText = row.dataset.direccion.toLowerCase();
+                            break;
+                        case 'telefono':
+                            searchText = row.dataset.telefono.toLowerCase();
+                            break;
+                        case 'estado':
+                            searchText = row.dataset.estado.toLowerCase();
+                            break;
+                        default:
+                            searchText = `${row.dataset.nombre} ${row.dataset.documento} ${row.dataset.direccion} ${row.dataset.telefono} ${row.dataset.estado}`.toLowerCase();
+                    }
+
+                    return searchText.includes(searchTerm);
+                });
+
+                // Ordenar filas
+                visibleRows.sort((a, b) => {
+                    switch(sortType) {
+                        case 'id-asc':
+                            return parseInt(a.dataset.id) - parseInt(b.dataset.id);
+                        case 'id-desc':
+                            return parseInt(b.dataset.id) - parseInt(a.dataset.id);
+                        case 'nombre-asc':
+                            return a.dataset.nombre.localeCompare(b.dataset.nombre);
+                        case 'nombre-desc':
+                            return b.dataset.nombre.localeCompare(a.dataset.nombre);
+                        default:
+                            return parseInt(a.dataset.id) - parseInt(b.dataset.id);
+                    }
+                });
+
+                // Limpiar tabla
+                tableBody.innerHTML = '';
+                // Mostrar resultados o mensaje de "no encontrado"
+                if (visibleRows.length === 0) {
+                    table.style.display = 'none';
+                    noResults.style.display = 'block';
+                } else {
+                    table.style.display = 'table';
+                    noResults.style.display = 'none';
+                    
+                    // Agregar filas filtradas y resaltar texto
+                    visibleRows.forEach(row => {
+                        if (searchTerm) {
+                            if (filterType === 'nombre') {
+                                const nombresCell = row.querySelector('.nombres-cell');
+                                const apellidosCell = row.querySelector('.apellidos-cell');
+                                nombresCell.innerHTML = highlightText(nombresCell.textContent, searchTerm);
+                                apellidosCell.innerHTML = highlightText(apellidosCell.textContent, searchTerm);
+                            } else if (filterType === 'documento') {
+                                const tipoDocCell = row.querySelector('.tipo-doc-cell');
+                                const numeroDocCell = row.querySelector('.numero-doc-cell');
+                                tipoDocCell.innerHTML = highlightText(tipoDocCell.textContent, searchTerm);
+                                numeroDocCell.innerHTML = highlightText(numeroDocCell.textContent, searchTerm);
+                            } else if (filterType === 'direccion') {
+                                const direccionCell = row.querySelector('.direccion-cell');
+                                direccionCell.innerHTML = highlightText(direccionCell.textContent, searchTerm);
+                            } else if (filterType === 'telefono') {
+                                const telefonoCell = row.querySelector('.telefono-cell');
+                                telefonoCell.innerHTML = highlightText(telefonoCell.textContent, searchTerm);
+                            } else if (filterType === 'all') {
+                                ['nombres-cell', 'apellidos-cell', 'tipo-doc-cell', 'numero-doc-cell', 'direccion-cell', 'telefono-cell'].forEach(className => {
+                                    const cell = row.querySelector(`.${className}`);
+                                    if (cell) {
+                                        cell.innerHTML = highlightText(cell.textContent, searchTerm);
+                                    }
+                                });
                             }
-                            tableBody.appendChild(row);
-                        });
-                    }
-                    
-                    // Actualizar estadísticas
-                    updateStats(visibleRows.length, searchTerm);
-                    
-                    // Mostrar/ocultar botón de limpiar
-                    clearSearch.style.display = searchTerm ? 'block' : 'none';
+                        }
+                        tableBody.appendChild(row);
+                    });
                 }
                 
-                // Función para actualizar estadísticas
-                function updateStats(visible, searchTerm) {
-                    if (searchTerm || statusFilter.value !== 'all') {
-                        searchStats.textContent = `Mostrando ${visible} de ${totalRows} clientes`;
-                        searchStats.style.display = 'block';
-                    } else {
-                        searchStats.style.display = 'none';
-                    }
+                // Actualizar estadísticas
+                updateStats(visibleRows.length, searchTerm);
+                
+                // Mostrar/ocultar botón de limpiar
+                clearSearch.style.display = searchTerm ? 'block' : 'none';
+            }
+            
+            // Función para actualizar estadísticas
+            function updateStats(visible, searchTerm) {
+                if (searchTerm || statusFilter.value !== 'all') {
+                    searchStats.textContent = `Mostrando ${visible} de ${totalRows} clientes`;
+                    searchStats.style.display = 'block';
+                } else {
+                    searchStats.style.display = 'none';
                 }
-                
-                // Event listeners
-                searchInput.addEventListener('input', filterAndSort);
-                filterBy.addEventListener('change', filterAndSort);
-                statusFilter.addEventListener('change', filterAndSort);
-                sortBy.addEventListener('change', filterAndSort);
-                
-                clearSearch.addEventListener('click', function() {
+            }
+            
+            // Event listeners
+            searchInput.addEventListener('input', filterAndSort);
+            filterBy.addEventListener('change', filterAndSort);
+            statusFilter.addEventListener('change', filterAndSort);
+            sortBy.addEventListener('change', filterAndSort);
+            
+            clearSearch.addEventListener('click', function() {
+                searchInput.value = '';
+                filterAndSort();
+                searchInput.focus();
+            });
+            
+            searchInput.focus();
+            
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                if (e.key === 'Escape' && document.activeElement === searchInput) {
                     searchInput.value = '';
                     filterAndSort();
-                    searchInput.focus();
-                });
-                
-                searchInput.focus();
-                
-                document.addEventListener('keydown', function(e) {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                        e.preventDefault();
-                        searchInput.focus();
-                        searchInput.select();
-                    }
-                    if (e.key === 'Escape' && document.activeElement === searchInput) {
-                        searchInput.value = '';
-                        filterAndSort();
-                    }
-                });
+                }
             });
-        </script>
-    </main>
+        });
+    </script>
+</main>
 
-    <?php include(__DIR__ . "/includes/footer.php"); ?>
-
+<?php include(__DIR__ . "/includes/footer.php"); ?>
 </body>
 </html>
