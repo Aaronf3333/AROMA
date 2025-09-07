@@ -21,6 +21,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
     $contrasena = $_POST['contrasena'];
     $idRol = intval($_POST['idRol']);
 
+    // Validar que si el tipo de documento no es "indocumentado", el número sea obligatorio
+    if ($tipoDocumento !== 'indocumentado' && empty($numeroDocumento)) {
+        $_SESSION['toast_message'] = "El número de documento es obligatorio para " . $tipoDocumento;
+        $_SESSION['toast_type'] = 'error';
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
+    // Si es indocumentado, establecer número como NULL
+    if ($tipoDocumento === 'indocumentado') {
+        $numeroDocumento = null;
+    }
+
     $conn->begin_transaction();
 
     try {
@@ -64,6 +77,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $direccion = $_POST['direccion'];
     $telefono = $_POST['telefono'];
     $idRol = intval($_POST['idRol']);
+
+    // Validar que si el tipo de documento no es "indocumentado", el número sea obligatorio
+    if ($tipoDocumento !== 'indocumentado' && empty($numeroDocumento)) {
+        $_SESSION['toast_message'] = "El número de documento es obligatorio para " . $tipoDocumento;
+        $_SESSION['toast_type'] = 'error';
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
+    // Si es indocumentado, establecer número como NULL
+    if ($tipoDocumento === 'indocumentado') {
+        $numeroDocumento = null;
+    }
 
     $conn->begin_transaction();
 
@@ -469,6 +495,16 @@ tbody tr:hover {
     color: var(--text-primary);
 }
 
+.form-group label .required {
+    color: var(--error-color);
+}
+
+.form-group label .optional {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -489,6 +525,12 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+input[type="text"]:disabled, select:disabled {
+    background-color: #f5f5f5;
+    color: var(--text-secondary);
+    cursor: not-allowed;
 }
 
 /* Toast Notifications */
@@ -799,7 +841,9 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                                     <td>
                                         <div class="user-info">
                                             <div class="user-name"><?php echo htmlspecialchars($row['tipoDocumento']); ?></div>
-                                            <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento']); ?></div>
+                                            <div class="user-detail">
+                                                <?php echo $row['numeroDocumento'] ? htmlspecialchars($row['numeroDocumento']) : 'Sin número'; ?>
+                                            </div>
                                         </div>
                                     </td>
                                     <td><?php echo htmlspecialchars($row['direccion']); ?></td>
@@ -841,56 +885,57 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-user"></i> Nombres</label>
+                        <label><i class="fas fa-user"></i> Nombres <span class="required">*</span></label>
                         <input type="text" name="nombres" required placeholder="Ingrese los nombres">
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-user"></i> Apellidos</label>
+                        <label><i class="fas fa-user"></i> Apellidos <span class="required">*</span></label>
                         <input type="text" name="apellidos" required placeholder="Ingrese los apellidos">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                        <select name="tipoDocumento" required>
+                        <label><i class="fas fa-id-card"></i> Tipo de Documento <span class="required">*</span></label>
+                        <select name="tipoDocumento" id="tipoDocumento" required onchange="toggleDocumentNumber('nuevo')">
                             <option value="">Seleccionar tipo</option>
                             <option value="DNI">DNI</option>
                             <option value="CE">Carnet de Extranjería</option>
+                            <option value="indocumentado">Indocumentado</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                        <input type="text" name="numeroDocumento" required placeholder="Ingrese el número">
+                        <label><i class="fas fa-hashtag"></i> Número de Documento <span class="required" id="docRequired">*</span><span class="optional" id="docOptional" style="display: none;">(opcional)</span></label>
+                        <input type="text" name="numeroDocumento" id="numeroDocumento" placeholder="Ingrese el número" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label><i class="fas fa-map-marker-alt"></i> Dirección</label>
+                    <label><i class="fas fa-map-marker-alt"></i> Dirección <span class="required">*</span></label>
                     <input type="text" name="direccion" required placeholder="Ingrese la dirección">
                 </div>
 
                 <div class="form-group">
-                    <label><i class="fas fa-phone"></i> Teléfono</label>
+                    <label><i class="fas fa-phone"></i> Teléfono <span class="required">*</span></label>
                     <input type="text" name="telefono" required placeholder="Ingrese el número de teléfono">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                        <label><i class="fas fa-envelope"></i> Correo Electrónico <span class="required">*</span></label>
                         <input type="text" name="usuario" required placeholder="ejemplo@correo.com">
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-lock"></i> Contraseña</label>
+                        <label><i class="fas fa-lock"></i> Contraseña <span class="required">*</span></label>
                         <input type="password" name="contrasena" required placeholder="Ingrese una contraseña segura">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label><i class="fas fa-user-tag"></i> Rol</label>
+                    <label><i class="fas fa-user-tag"></i> Rol <span class="required">*</span></label>
                     <select name="idRol" required>
                         <option value="">Seleccionar rol</option>
                         <?php foreach($roles as $rol): ?>
@@ -921,56 +966,57 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-user"></i> Nombres</label>
+                        <label><i class="fas fa-user"></i> Nombres <span class="required">*</span></label>
                         <input type="text" name="nombres" id="edit_nombres" required placeholder="Ingrese los nombres">
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-user"></i> Apellidos</label>
+                        <label><i class="fas fa-user"></i> Apellidos <span class="required">*</span></label>
                         <input type="text" name="apellidos" id="edit_apellidos" required placeholder="Ingrese los apellidos">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                        <select name="tipoDocumento" id="edit_tipoDocumento" required>
+                        <label><i class="fas fa-id-card"></i> Tipo de Documento <span class="required">*</span></label>
+                        <select name="tipoDocumento" id="edit_tipoDocumento" required onchange="toggleDocumentNumber('editar')">
                             <option value="">Seleccionar tipo</option>
                             <option value="DNI">DNI</option>
                             <option value="CE">Carnet de Extranjería</option>
+                            <option value="indocumentado">Indocumentado</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                        <input type="text" name="numeroDocumento" id="edit_numeroDocumento" required placeholder="Ingrese el número">
+                        <label><i class="fas fa-hashtag"></i> Número de Documento <span class="required" id="edit_docRequired">*</span><span class="optional" id="edit_docOptional" style="display: none;">(opcional)</span></label>
+                        <input type="text" name="numeroDocumento" id="edit_numeroDocumento" placeholder="Ingrese el número" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label><i class="fas fa-map-marker-alt"></i> Dirección</label>
+                    <label><i class="fas fa-map-marker-alt"></i> Dirección <span class="required">*</span></label>
                     <input type="text" name="direccion" id="edit_direccion" required placeholder="Ingrese la dirección">
                 </div>
 
                 <div class="form-group">
-                    <label><i class="fas fa-phone"></i> Teléfono</label>
+                    <label><i class="fas fa-phone"></i> Teléfono <span class="required">*</span></label>
                     <input type="text" name="telefono" id="edit_telefono" required placeholder="Ingrese el número de teléfono">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                        <label><i class="fas fa-envelope"></i> Correo Electrónico <span class="required">*</span></label>
                         <input type="text" name="usuario" id="edit_usuario" required placeholder="ejemplo@correo.com">
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-lock"></i> Contraseña</label>
+                        <label><i class="fas fa-lock"></i> Contraseña <span class="required">*</span></label>
                         <input type="password" name="contrasena" id="edit_contrasena" required placeholder="Ingrese una contraseña segura">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label><i class="fas fa-user-tag"></i> Rol</label>
+                    <label><i class="fas fa-user-tag"></i> Rol <span class="required">*</span></label>
                     <select name="idRol" id="edit_idRol" required>
                         <option value="">Seleccionar rol</option>
                         <?php foreach($roles as $rol): ?>
@@ -1045,12 +1091,45 @@ function hideToast(button) {
     }, 300);
 }
 
+// Función para manejar la validación condicional del número de documento
+function toggleDocumentNumber(modalType) {
+    const prefix = modalType === 'nuevo' ? '' : 'edit_';
+    const tipoDocSelect = document.getElementById(prefix + 'tipoDocumento');
+    const numeroDocInput = document.getElementById(prefix + 'numeroDocumento');
+    const requiredSpan = document.getElementById(prefix + 'docRequired');
+    const optionalSpan = document.getElementById(prefix + 'docOptional');
+    
+    if (tipoDocSelect.value === 'indocumentado') {
+        // Si es indocumentado, hacer el campo opcional
+        numeroDocInput.removeAttribute('required');
+        numeroDocInput.disabled = true;
+        numeroDocInput.value = '';
+        numeroDocInput.placeholder = 'No aplica para indocumentados';
+        
+        // Cambiar las etiquetas
+        if (requiredSpan) requiredSpan.style.display = 'none';
+        if (optionalSpan) optionalSpan.style.display = 'inline';
+    } else {
+        // Si tiene documento, hacer el campo obligatorio
+        numeroDocInput.setAttribute('required', 'required');
+        numeroDocInput.disabled = false;
+        numeroDocInput.placeholder = 'Ingrese el número';
+        
+        // Cambiar las etiquetas
+        if (requiredSpan) requiredSpan.style.display = 'inline';
+        if (optionalSpan) optionalSpan.style.display = 'none';
+    }
+}
+
 // Funciones para modales
 function abrirModal(tipo) {
     if (tipo === 'nuevo') {
         currentModal = document.getElementById('modalNuevo');
         currentModal.classList.add('show');
         document.body.style.overflow = 'hidden';
+
+        // Resetear el estado del campo de número de documento
+        toggleDocumentNumber('nuevo');
 
         // Enfocar el primer campo
         setTimeout(() => {
@@ -1070,12 +1149,15 @@ function abrirModalEditar(userData) {
     document.getElementById('edit_nombres').value = userData.nombres;
     document.getElementById('edit_apellidos').value = userData.apellidos;
     document.getElementById('edit_tipoDocumento').value = userData.tipoDocumento;
-    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento;
+    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento || '';
     document.getElementById('edit_direccion').value = userData.direccion;
     document.getElementById('edit_telefono').value = userData.telefono;
     document.getElementById('edit_usuario').value = userData.usuario;
     document.getElementById('edit_contrasena').value = userData.contrasena;
     document.getElementById('edit_idRol').value = userData.idRol;
+    
+    // Aplicar la validación condicional según el tipo de documento
+    toggleDocumentNumber('editar');
     
     currentModal.classList.add('show');
     document.body.style.overflow = 'hidden';
@@ -1098,6 +1180,12 @@ function cerrarModal() {
         const form = currentModal.querySelector('form');
         if (form) {
             form.reset();
+            // Resetear también el estado del campo de documento
+            if (currentModal.id === 'modalNuevo') {
+                toggleDocumentNumber('nuevo');
+            } else {
+                toggleDocumentNumber('editar');
+            }
         }
         
         currentModal = null;
@@ -1152,7 +1240,8 @@ document.querySelectorAll('form').forEach(form => {
         let isValid = true;
         
         requiredFields.forEach(field => {
-            if (!field.value.trim()) {
+            // Solo validar si el campo no está deshabilitado
+            if (!field.disabled && !field.value.trim()) {
                 field.style.borderColor = 'var(--error-color)';
                 field.style.boxShadow = '0 0 0 3px rgba(245, 101, 101, 0.1)';
                 isValid = false;
@@ -1264,12 +1353,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Validación de documento
+    // Validación de documento - solo permitir números cuando el campo está habilitado
     const docInputs = document.querySelectorAll('input[name="numeroDocumento"]');
     docInputs.forEach(input => {
         input.addEventListener('input', function() {
-            // Solo permitir números
-            this.value = this.value.replace(/[^0-9]/g, '');
+            if (!this.disabled) {
+                // Solo permitir números
+                this.value = this.value.replace(/[^0-9]/g, '');
+            }
         });
     });
     
@@ -1281,6 +1372,9 @@ document.addEventListener('DOMContentLoaded', function() {
             this.value = this.value.replace(/[^0-9+\-\s()]/g, '');
         });
     });
+
+    // Inicializar el estado de los campos de documento al cargar la página
+    toggleDocumentNumber('nuevo');
 });
 </script>
 </body>
