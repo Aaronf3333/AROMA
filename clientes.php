@@ -21,8 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     $apellidos = trim($_POST['apellidos']);
     $tipoDocumento = $_POST['tipoDocumento'];
 
-    // CORRECCIÓN: Verifica si la clave existe antes de intentar acceder a ella
+    // Aseguramos que la clave exista, si no, es una cadena vacía por defecto
     $numeroDocumento = isset($_POST['numeroDocumento']) ? trim($_POST['numeroDocumento']) : '';
+
+    // CORRECCIÓN CLAVE: Si el numeroDocumento está vacío, lo convertimos a NULL
+    if (empty($numeroDocumento)) {
+        $numeroDocumento = NULL;
+    }
 
     $direccion = trim($_POST['direccion']);
     $telefono = trim($_POST['telefono']);
@@ -33,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
     try {
         // 1. Lógica para verificar y registrar la persona
         $idPersona = null;
-        if ($tipoDocumento !== 'indocumentado') {
+        if ($tipoDocumento !== 'indocumentado' && $numeroDocumento !== NULL) {
             // Verificar si la persona con el mismo tipo y número de documento ya existe
             $checkSql = "SELECT idPersona FROM persona WHERE tipoDocumento = ? AND numeroDocumento = ?";
             $stmtCheck = $conn->prepare($checkSql);
@@ -46,8 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
                 $idPersona = $rowCheck['idPersona'];
             }
         }
-
-        // Si la persona no existe, la insertamos
+        
+        // 2. Si la persona no existe, la insertamos
+        // Esta lógica maneja tanto los casos con documento como los indocumentados
         if ($idPersona === null) {
             $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono)
                             VALUES (?, ?, ?, ?, ?, ?)";
@@ -59,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
             $_SESSION['tipo'] = "success";
         }
 
-        // 2. Lógica para verificar si la persona ya es un cliente
+        // 3. Lógica para verificar si la persona ya es un cliente
         $checkClienteSql = "SELECT idCliente FROM cliente WHERE idPersona = ?";
         $stmtCheckCliente = $conn->prepare($checkClienteSql);
         $stmtCheckCliente->bind_param("i", $idPersona);
@@ -68,17 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         $rowCheckCliente = $resultCheckCliente->fetch_assoc();
 
         if ($rowCheckCliente) {
-            // Si la persona ya existe como cliente, mostramos una advertencia
             $_SESSION['mensaje'] = "Esta persona ya está registrada como cliente.";
             $_SESSION['tipo'] = "warning";
         } else {
-            // Si la persona no es cliente, la insertamos
             $sqlCliente = "INSERT INTO cliente (idPersona) VALUES (?)";
             $stmtCliente = $conn->prepare($sqlCliente);
             $stmtCliente->bind_param("i", $idPersona);
             $stmtCliente->execute();
 
-            // Si llegamos aquí, la inserción fue exitosa (ya sea nueva persona o persona existente)
             $_SESSION['mensaje'] = "Cliente agregado correctamente.";
             $_SESSION['tipo'] = "success";
         }
@@ -86,7 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         $conn->commit();
     } catch (mysqli_sql_exception $e) {
         $conn->rollback();
-        // Si hay una violación de la restricción UNIQUE de persona, significa que el documento ya existe.
         if (strpos($e->getMessage(), 'UQ_Persona_Documento') !== false) {
              $_SESSION['mensaje'] = "Error: Ya existe un registro con el mismo tipo y número de documento.";
              $_SESSION['tipo'] = "error";
@@ -96,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         }
     }
 
-    // CORRECCIÓN: La redirección ahora es la última acción, asegurando que no haya salida antes.
     header("Location: clientes.php");
     exit();
 }
@@ -439,7 +440,7 @@ $conn->close();
             font-size: 16px;
             font-weight: bold;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.3);
             opacity: 0;
             transition: opacity 0.5s ease, transform 0.5s ease;
             z-index: 9999;
@@ -748,13 +749,11 @@ $conn->close();
             tipoDocumentoSelect.addEventListener('change', function() {
                 if (this.value === 'indocumentado') {
                     numeroDocumentoInput.required = false;
-                    // CORRECCIÓN: Usar readonly en lugar de disabled
                     numeroDocumentoInput.readOnly = true;
                     numeroDocumentoInput.placeholder = "No aplica";
                     numeroDocumentoInput.value = '';
                 } else {
                     numeroDocumentoInput.required = true;
-                    // CORRECCIÓN: Quitar la propiedad readonly
                     numeroDocumentoInput.readOnly = false;
                     numeroDocumentoInput.placeholder = "Número de documento";
                 }
