@@ -49,12 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $validacionExitosa = true;
     foreach ($productosSeleccionados as $idProd => $cantData) {
+        // Solución al error: verificar si la clave 'cantidad' existe antes de acceder a ella
+        if (!isset($cantData['cantidad'])) {
+            continue; // Ignora este producto y pasa al siguiente
+        }
+        
         $cantidad = intval($cantData['cantidad']);
         $precioUnitario = floatval($cantData['precioUnitario']);
+        
+        // Validar que la cantidad y el precio sean positivos
         if ($cantidad <= 0 || $precioUnitario <= 0) {
             $validacionExitosa = false;
             break;
         }
+        
         $subtotal = $cantidad * $precioUnitario;
         $total += $subtotal;
         $detalleProductos[$idProd] = [
@@ -63,8 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'nombre' => htmlspecialchars($cantData['nombre'])
         ];
     }
-    if (!$validacionExitosa) {
-        $_SESSION['mensaje'] = "Error: La cantidad y el precio del producto deben ser mayores a cero.";
+    
+    // Verificación final del total
+    if ($total <= 0 || !$validacionExitosa) {
+        $_SESSION['mensaje'] = "Error: La cantidad o el precio de un producto no son válidos.";
         $_SESSION['tipo'] = "warning";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
@@ -133,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Info cliente
         if ($idCliente == 0) {
-            $clienteNombre = "Cliente Indocumentado";
-            $clienteDoc = "N/A: -----";
+            $clienteNombre = "Cliente";
+            $clienteDoc = "DNI: -----";
         } else {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
@@ -151,12 +161,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 7);
-        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L'); // Línea 155 - Eliminado utf8_decode()
+        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L'); 
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L'); // Línea 157 - Eliminado utf8_decode()
+        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L'); 
         if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L'); // Línea 160 - Eliminado utf8_decode()
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L'); 
         }
         if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
             $pdf->Ln(1);
@@ -184,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
-            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar); // Línea 188 - Eliminado utf8_decode()
+            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar); 
             $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
             $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
             $pdf->Cell($anchoSubtotal, 6, 'S/ ' . number_format($data['cantidad'] * $data['precioUnitario'], 2), 1, 1, 'R', $alternar);
@@ -221,14 +231,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Ln(6);
         $pdf->SetFont('Arial', 'I', 7);
         $pdf->SetTextColor(100, 100, 100);
-        $pdf->Cell($anchoEfectivo, 4, '¡Gracias por su compra!', 0, 1, 'C'); // Línea 225 - Eliminado utf8_decode()
+        $pdf->Cell($anchoEfectivo, 4, '¡Gracias por su compra!', 0, 1, 'C');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, 'www.aromasac.com', 0, 1, 'C');
         $pdf->Ln(3);
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->SetTextColor(170, 170, 170);
-        $pdf->Cell($anchoEfectivo, 4, 'Esta nota no tiene valor tributario.', 0, 1, 'C'); // Línea 231 - Eliminado utf8_decode()
-        $pdf->Cell($anchoEfectivo, 4, 'Solicite su Boleta de Venta o Factura.', 0, 1, 'C'); // Línea 232 - Eliminado utf8_decode()
+        $pdf->Cell($anchoEfectivo, 4, 'Esta nota no tiene valor tributario.', 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, 'Solicite su Boleta de Venta o Factura.', 0, 1, 'C');
 
         $pdfContent = $pdf->Output('S');
 
@@ -616,9 +626,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
                         <input type="text" id="clienteSearch" class="form-input dropdown-input" placeholder="Nombre o DNI del cliente" readonly>
                         <ul id="clienteList" class="dropdown-list">
-                            <li class="dropdown-item" data-id="0" data-nombre="Cliente Indocumentado" data-dni="-----">
+                            <li class="dropdown-item" data-id="0" data-nombre="Cliente" data-dni="-----">
                                 <label>
-                                    <span class="cliente-nombre">Cliente Indocumentado</span>
+                                    <span class="cliente-nombre">Cliente</span>
                                     <span class="cliente-doc">(-----)</span>
                                 </label>
                             </li>
