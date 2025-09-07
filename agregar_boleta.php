@@ -846,6 +846,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             formBoleta.addEventListener('submit', function(e) {
                 const selectedProductsCount = productsList.querySelectorAll('.product-item.selected').length;
                 const clienteSeleccionado = idClienteHidden.value;
+                const totalCalculated = parseFloat(totalAmountSpan.textContent.replace('S/. ', '')) || 0;
+                const montoPagadoValue = parseFloat(montoPagadoInput.value) || 0;
 
                 if (selectedProductsCount === 0) {
                     e.preventDefault();
@@ -859,7 +861,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return;
                 }
 
-                if (parseFloat(montoPagadoInput.value) < total) {
+                // Validación final en el cliente antes de enviar
+                if (totalCalculated <= 0) {
+                    e.preventDefault();
+                    showToast('Error: El total de la venta debe ser mayor a S/. 0.00.', 'warning');
+                    return;
+                }
+
+                if (montoPagadoValue < totalCalculated) {
                     e.preventDefault();
                     showToast('El monto pagado debe ser mayor o igual al total.', 'warning');
                     return;
@@ -868,8 +877,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
-                document.getElementById('montoPagadoHidden').value = montoPagadoInput.value;
-                document.getElementById('cambioHidden').value = parseFloat(cambioAmountSpan.textContent.replace('S/. ', '')) || 0;
+                document.getElementById('montoPagadoHidden').value = montoPagadoValue.toFixed(2);
+                document.getElementById('cambioHidden').value = (montoPagadoValue - totalCalculated).toFixed(2);
             });
             
             updateTotal();
@@ -883,6 +892,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 </body>
 </html>
-
----
-This video provides a practical example of how to validate data from an HTML form using PHP, which is directly relevant to solving the issue you're facing.
