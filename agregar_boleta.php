@@ -144,7 +144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
             $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-            $clienteDoc = $cliente['tipoDocumento'] . ': ' . ($cliente['numeroDocumento'] ? htmlspecialchars($cliente['numeroDocumento']) : '-----');
+            // Corregimos el problema de htmlspecialchars
+            $clienteDoc = $cliente['tipoDocumento'] . ': ' . htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
         }
 
         $pdf->SetFont('Arial', 'B', 8);
@@ -481,16 +482,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
         }
         .payment-info .form-group {
             margin-bottom: 0;
-            flex-grow: 1;
+            flex: 1;
         }
-        .payment-info > span {
-            flex-basis: 48%;
+        .payment-info .form-group:last-child {
             text-align: right;
-            font-weight: bold;
+            margin-left: 20px; /* Espacio entre los dos campos */
         }
         .payment-info #cambioAmount {
             font-weight: bold;
@@ -582,6 +581,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
             transition: background-color 0.2s ease, border-left 0.2s ease;
+            display: flex;
+            justify-content: space-between;
         }
         .dropdown-item:hover, .dropdown-item.selected {
             background-color: var(--bg-light);
@@ -589,6 +590,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .dropdown-item:last-child {
             border-bottom: none;
+        }
+        .cliente-doc {
+            color: var(--text-light);
+            font-size: 13px;
         }
     </style>
 </head>
@@ -618,11 +623,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <span class="cliente-doc">(-----)</span>
                                 </label>
                             </li>
-                            <?php while($cli = mysqli_fetch_assoc($resultClientes)): ?>
-                                <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-dni="<?php echo htmlspecialchars($cli['numeroDocumento']); ?>">
+                            <?php mysqli_data_seek($resultClientes, 0); while($cli = mysqli_fetch_assoc($resultClientes)): ?>
+                                <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-dni="<?php echo htmlspecialchars($cli['numeroDocumento'] ?? ''); ?>">
                                     <label>
                                         <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
-                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento']); ?>)</span>
+                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento'] ?? 'N/A'); ?>)</span>
                                     </label>
                                 </li>
                             <?php endwhile; ?>
@@ -634,7 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-section">
                     <h3 class="section-title"><i class="fas fa-boxes"></i> Seleccionar Productos</h3>
                     <div class="products-list" id="productsList">
-                        <?php while($prod = mysqli_fetch_assoc($resultProductos)): ?>
+                        <?php mysqli_data_seek($resultProductos, 0); while($prod = mysqli_fetch_assoc($resultProductos)): ?>
                             <div class="product-item" data-id="<?php echo $prod['idProducto']; ?>">
                                 <input type="checkbox"
                                        class="product-checkbox"
@@ -672,7 +677,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <label for="montoPagado" class="form-label">Monto Pagado</label>
                                 <input type="number" step="0.01" min="0" class="form-input" id="montoPagado" required placeholder="0.00">
                             </div>
-                            <div class="form-group" style="text-align: right;">
+                            <div class="form-group">
                                 <span class="form-label">Cambio:</span>
                                 <span id="cambioAmount">S/. 0.00</span>
                             </div>
@@ -711,16 +716,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const allClientes = Array.from(clienteList.querySelectorAll('.dropdown-item'));
             
             // Lógica del desplegable de clientes
-            clienteSearchInput.addEventListener('focus', () => clienteList.classList.add('show'));
-            clienteSearchInput.addEventListener('blur', () => {
-                setTimeout(() => clienteList.classList.remove('show'), 200);
+            clienteSearchInput.addEventListener('click', () => {
+                clienteList.classList.toggle('show');
             });
             clienteSearchInput.addEventListener('input', () => {
                 const filter = clienteSearchInput.value.toLowerCase();
                 allClientes.forEach(item => {
                     const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(filter) ? 'block' : 'none';
+                    item.style.display = text.includes(filter) ? 'flex' : 'none';
                 });
+                clienteList.classList.add('show');
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.dropdown-container')) {
+                    clienteList.classList.remove('show');
+                }
             });
 
             clienteList.addEventListener('click', (e) => {
