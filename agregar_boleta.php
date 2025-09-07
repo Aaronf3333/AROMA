@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $total = 0;
     $detalleProductos = [];
 
-    // Validaciones
+    // Validaciones iniciales
     if ($idCliente === null || empty($productosSeleccionados)) {
         $_SESSION['mensaje'] = "Error: Por favor, selecciona un cliente y al menos un producto.";
         $_SESSION['tipo'] = "warning";
@@ -49,12 +49,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $validacionExitosa = true;
     foreach ($productosSeleccionados as $idProd => $cantData) {
-        if (!isset($cantData['cantidad']) || !is_numeric($cantData['cantidad']) || intval($cantData['cantidad']) <= 0) {
+        // Validación mejorada para la cantidad y el precio
+        if (!isset($cantData['cantidad']) || !is_numeric($cantData['cantidad']) || floatval($cantData['cantidad']) <= 0) {
             $validacionExitosa = false;
-            break;
+            break; // Salir del bucle si se encuentra un valor inválido
         }
         
-        $cantidad = intval($cantData['cantidad']);
+        $cantidad = floatval($cantData['cantidad']);
         $precioUnitario = floatval($cantData['precioUnitario']);
         
         if ($cantidad <= 0 || $precioUnitario <= 0) {
@@ -71,8 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
     }
     
-    if ($total <= 0 || !$validacionExitosa) {
-        $_SESSION['mensaje'] = "Error: La cantidad o el precio de un producto no son válidos.";
+    // Si la validación falló, redirigir con un mensaje de error
+    if (!$validacionExitosa || $total <= 0) {
+        $_SESSION['mensaje'] = "Error: La cantidad de un producto no puede ser cero o un valor no numérico.";
         $_SESSION['tipo'] = "warning";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
@@ -368,7 +370,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-family: inherit;
             transition: all 0.3s ease;
             background: rgba(255, 255, 255, 0.8);
-            text-align: center; /* ESTILO AGREGADO */
+            text-align: center;
         }
         .form-input:focus, .form-select:focus {
             outline: none;
@@ -881,3 +883,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 </body>
 </html>
+
+---
+This video provides a practical example of how to validate data from an HTML form using PHP, which is directly relevant to solving the issue you're facing.
