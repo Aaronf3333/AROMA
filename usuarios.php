@@ -1353,13 +1353,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Validación de documento - solo permitir números cuando el campo está habilitado
+    // Validación de documento - solo permitir números cuando el campo no está en readonly
     const docInputs = document.querySelectorAll('input[name="numeroDocumento"]');
     docInputs.forEach(input => {
         input.addEventListener('input', function() {
-            if (!this.disabled) {
+            if (!this.readOnly) {
                 // Solo permitir números
                 this.value = this.value.replace(/[^0-9]/g, '');
+            }
+        });
+        
+        // Prevenir edición cuando está en readonly
+        input.addEventListener('keydown', function(e) {
+            if (this.readOnly) {
+                e.preventDefault();
             }
         });
     });
