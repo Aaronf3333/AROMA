@@ -137,10 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $clienteNombre = "Cliente Genérico";
         $clienteTipoDoc = "DNI";
         $clienteNumeroDoc = "-----";
-        $clienteDireccion = "";
-        $clienteTelefono = "";
 
-        if ($idCliente > 0) {
+        if ($idCliente != 0) {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
             mysqli_stmt_bind_param($stmtCliente, "i", $idCliente);
@@ -148,13 +146,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resultCliente = mysqli_stmt_get_result($stmtCliente);
             $cliente = mysqli_fetch_assoc($resultCliente);
             mysqli_stmt_close($stmtCliente);
-
-            if ($cliente) {
-                $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
-                $clienteTipoDoc = !empty($cliente['tipoDocumento']) ? $cliente['tipoDocumento'] : 'DNI';
-                $clienteNumeroDoc = !empty($cliente['numeroDocumento']) ? htmlspecialchars($cliente['numeroDocumento']) : '-----';
-                $clienteDireccion = $cliente['direccion'] ?? '';
-                $clienteTelefono = $cliente['telefono'] ?? '';
+            
+            $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
+            $clienteTipoDoc = htmlspecialchars($cliente['tipoDocumento'] ?? 'DNI');
+            $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
+            if (empty($clienteNumeroDoc)) {
+                $clienteNumeroDoc = '-----';
             }
         }
         
@@ -165,13 +162,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->Cell($anchoEfectivo, 4, $clienteTipoDoc . ': ' . $clienteNumeroDoc, 0, 1, 'L');
-        if (!empty($clienteDireccion)) {
+        if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . htmlspecialchars($clienteDireccion), 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
         }
-        if (!empty($clienteTelefono)) {
+        if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . htmlspecialchars($clienteTelefono), 0, 1, 'L');
+            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . $cliente['telefono'], 0, 1, 'L');
         }
         $pdf->Ln(5);
 
@@ -628,14 +625,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
                         <input type="text" id="clienteSearch" class="form-input dropdown-input" placeholder="Nombre o DNI del cliente" readonly>
                         <ul id="clienteList" class="dropdown-list">
-                            <li class="dropdown-item" data-id="0" data-nombre="Cliente" data-dni="-----">
+                            <li class="dropdown-item" data-id="0" data-nombre="Cliente Genérico" data-tipodoc="DNI" data-numerodoc="-----">
                                 <label>
                                     <span class="cliente-nombre">Cliente Genérico</span>
-                                    <span class="cliente-doc">(-----)</span>
+                                    <span class="cliente-doc">(DNI: -----)</span>
                                 </label>
                             </li>
                             <?php mysqli_data_seek($resultClientes, 0); while($cli = mysqli_fetch_assoc($resultClientes)): ?>
-                                <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-dni="<?php echo htmlspecialchars($cli['numeroDocumento'] ?? ''); ?>">
+                                <li class="dropdown-item" data-id="<?php echo $cli['idCliente']; ?>" data-nombre="<?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?>" data-tipodoc="<?php echo htmlspecialchars($cli['tipoDocumento'] ?? 'DNI'); ?>" data-numerodoc="<?php echo htmlspecialchars($cli['numeroDocumento'] ?? ''); ?>">
                                     <label>
                                         <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
                                         <span class="cliente-doc">(<?php echo htmlspecialchars($cli['numeroDocumento'] ?? 'N/A'); ?>)</span>
@@ -645,6 +642,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </ul>
                     </div>
                     <input type="hidden" name="idCliente" id="idClienteHidden" required>
+                    <input type="hidden" name="cliente_nombre" id="clienteNombreHidden">
+                    <input type="hidden" name="cliente_tipodoc" id="clienteTipoDocHidden">
+                    <input type="hidden" name="cliente_numerodoc" id="clienteNumeroDocHidden">
                 </div>
 
                 <div class="form-section">
@@ -714,6 +714,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const clienteSearchInput = document.getElementById('clienteSearch');
             const clienteList = document.getElementById('clienteList');
             const idClienteHidden = document.getElementById('idClienteHidden');
+            const clienteNombreHidden = document.getElementById('clienteNombreHidden');
+            const clienteTipoDocHidden = document.getElementById('clienteTipoDocHidden');
+            const clienteNumeroDocHidden = document.getElementById('clienteNumeroDocHidden');
             const productsList = document.getElementById('productsList');
             const summaryPanel = document.getElementById('summaryPanel');
             const summaryItems = document.getElementById('summaryItems');
@@ -749,10 +752,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (item) {
                     const id = item.dataset.id;
                     const nombre = item.dataset.nombre;
-                    const dni = item.dataset.dni;
+                    const tipoDoc = item.dataset.tipodoc;
+                    const numeroDoc = item.dataset.numerodoc;
 
                     idClienteHidden.value = id;
-                    clienteSearchInput.value = `${nombre} (${dni})`;
+                    clienteNombreHidden.value = nombre;
+                    clienteTipoDocHidden.value = tipoDoc;
+                    clienteNumeroDocHidden.value = numeroDoc;
+
+                    clienteSearchInput.value = `${nombre} (${tipoDoc}: ${numeroDoc})`;
                     clienteList.classList.remove('show');
 
                     allClientes.forEach(li => li.classList.remove('selected'));
