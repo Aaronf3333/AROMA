@@ -47,33 +47,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    $validacionExitosa = true;
+    // Lógica modificada: Ahora solo se procesan los productos con cantidad > 0
     foreach ($productosSeleccionados as $idProd => $cantData) {
-        // Validación mejorada para la cantidad y el precio
         $cantidad = isset($cantData['cantidad']) ? floatval($cantData['cantidad']) : 0;
         $precioUnitario = isset($cantData['precioUnitario']) ? floatval($cantData['precioUnitario']) : 0;
-
-        if ($cantidad <= 0 || $precioUnitario <= 0) {
-            $validacionExitosa = false;
-            break; // Salir del bucle si se encuentra un valor inválido
+    
+        if ($cantidad > 0 && $precioUnitario > 0) {
+            $subtotal = $cantidad * $precioUnitario;
+            $total += $subtotal;
+            $detalleProductos[$idProd] = [
+                'cantidad' => $cantidad,
+                'precioUnitario' => $precioUnitario,
+                'nombre' => htmlspecialchars($cantData['nombre'])
+            ];
         }
-        
-        $subtotal = $cantidad * $precioUnitario;
-        $total += $subtotal;
-        $detalleProductos[$idProd] = [
-            'cantidad' => $cantidad,
-            'precioUnitario' => $precioUnitario,
-            'nombre' => htmlspecialchars($cantData['nombre'])
-        ];
     }
     
-    // Si la validación falló, redirigir con un mensaje de error
-    if (!$validacionExitosa || $total <= 0) {
+    // Validación de que al menos un producto fue seleccionado correctamente
+    if (empty($detalleProductos) || $total <= 0) {
         $_SESSION['mensaje'] = "Error: La cantidad de un producto no puede ser cero o un valor no numérico.";
         $_SESSION['tipo'] = "warning";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+
     if ($montoPagado < $total) {
         $_SESSION['mensaje'] = "Error: El monto pagado debe ser mayor o igual al total.";
         $_SESSION['tipo'] = "warning";
@@ -156,12 +153,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
         $pdf->Ln(1);
         $pdf->SetFont('Arial', '', 7);
-        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L'); 
+        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
         $pdf->Ln(1);
-        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L'); 
+        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L');
         if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
             $pdf->Ln(1);
-            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L'); 
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
         }
         if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
             $pdf->Ln(1);
@@ -189,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (strlen($nombreProducto) > 22) {
                 $nombreProducto = substr($nombreProducto, 0, 19) . '...';
             }
-            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar); 
+            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar);
             $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
             $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
             $pdf->Cell($anchoSubtotal, 6, 'S/ ' . number_format($data['cantidad'] * $data['precioUnitario'], 2), 1, 1, 'R', $alternar);
@@ -647,20 +644,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php mysqli_data_seek($resultProductos, 0); while($prod = mysqli_fetch_assoc($resultProductos)): ?>
                             <div class="product-item" data-id="<?php echo $prod['idProducto']; ?>">
                                 <input type="checkbox"
-                                       class="product-checkbox"
-                                       data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
-                                       data-precio="<?php echo $prod['precio']; ?>"
-                                       value="<?php echo $prod['idProducto']; ?>">
+                                        class="product-checkbox"
+                                        data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
+                                        data-precio="<?php echo $prod['precio']; ?>"
+                                        value="<?php echo $prod['idProducto']; ?>">
                                 <div class="product-details">
                                     <div class="product-name"><?php echo htmlspecialchars($prod['nombreProducto']); ?></div>
                                     <div class="product-price">S/. <?php echo number_format($prod['precio'], 2); ?></div>
                                 </div>
                                 <input type="number"
-                                       name="productos[<?php echo $prod['idProducto']; ?>][cantidad]"
-                                       class="product-quantity"
-                                       min="1"
-                                       value="1"
-                                       disabled>
+                                        name="productos[<?php echo $prod['idProducto']; ?>][cantidad]"
+                                        class="product-quantity"
+                                        min="1"
+                                        value="1"
+                                        disabled>
                                 <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][precioUnitario]" value="<?php echo $prod['precio']; ?>">
                                 <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][nombre]" value="<?php echo htmlspecialchars($prod['nombreProducto']); ?>">
                             </div>
@@ -773,20 +770,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     const productName = checkbox.dataset.nombre;
                     const productPrice = parseFloat(checkbox.dataset.precio);
                     
-                    // Asegurar que la cantidad sea un número válido y mayor a 0
                     const quantity = parseInt(quantityInput.value) || 0;
                     if (quantity <= 0) {
                         quantityInput.value = 1;
                     }
                     
-                    const subtotal = productPrice * quantity;
-                    
                     if (quantity > 0) {
+                        const subtotal = productPrice * quantity;
                         total += subtotal;
                         itemsHtml += `<li class="summary-item">
-                                            <span>${productName} (${quantity}x)</span>
-                                            <span>S/. ${subtotal.toFixed(2)}</span>
-                                        </li>`;
+                                        <span>${productName} (${quantity}x)</span>
+                                        <span>S/. ${subtotal.toFixed(2)}</span>
+                                    </li>`;
                     }
                 });
 
@@ -839,7 +834,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             productsList.addEventListener('input', (event) => {
                 if (event.target.classList.contains('product-quantity')) {
-                    // Asegurar que el valor sea un número válido al escribir
                     let quantity = parseInt(event.target.value);
                     if (isNaN(quantity) || quantity < 1) {
                         event.target.value = 1;
@@ -855,7 +849,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const clienteSeleccionado = idClienteHidden.value;
                 let totalIsValid = true;
 
-                // Validación final de cantidades antes de enviar el formulario
                 selectedProducts.forEach(item => {
                     const quantityInput = item.querySelector('.product-quantity');
                     const quantity = parseInt(quantityInput.value);
