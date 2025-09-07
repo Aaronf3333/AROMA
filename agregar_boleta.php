@@ -47,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Lógica modificada: Ahora solo se procesan los productos con cantidad > 0
     foreach ($productosSeleccionados as $idProd => $cantData) {
         $cantidad = isset($cantData['cantidad']) ? floatval($cantData['cantidad']) : 0;
         $precioUnitario = isset($cantData['precioUnitario']) ? floatval($cantData['precioUnitario']) : 0;
@@ -63,7 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Validación de que al menos un producto fue seleccionado correctamente
     if (empty($detalleProductos) || $total <= 0) {
         $_SESSION['mensaje'] = "Error: La cantidad de un producto no puede ser cero o un valor no numérico.";
         $_SESSION['tipo'] = "warning";
