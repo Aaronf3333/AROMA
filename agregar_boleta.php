@@ -49,8 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $validacionExitosa = true;
     foreach ($productosSeleccionados as $idProd => $cantData) {
-        // Solución al error: verificar si la clave 'cantidad' existe antes de acceder a ella
-        // También se valida que sea un valor numérico y mayor a 0
         if (!isset($cantData['cantidad']) || !is_numeric($cantData['cantidad']) || intval($cantData['cantidad']) <= 0) {
             $validacionExitosa = false;
             break;
@@ -59,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cantidad = intval($cantData['cantidad']);
         $precioUnitario = floatval($cantData['precioUnitario']);
         
-        // Validar que la cantidad y el precio sean positivos
         if ($cantidad <= 0 || $precioUnitario <= 0) {
             $validacionExitosa = false;
             break;
@@ -74,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
     }
     
-    // Verificación final del total
     if ($total <= 0 || !$validacionExitosa) {
         $_SESSION['mensaje'] = "Error: La cantidad o el precio de un producto no son válidos.";
         $_SESSION['tipo'] = "warning";
@@ -372,6 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-family: inherit;
             transition: all 0.3s ease;
             background: rgba(255, 255, 255, 0.8);
+            text-align: center; /* ESTILO AGREGADO */
         }
         .form-input:focus, .form-select:focus {
             outline: none;
