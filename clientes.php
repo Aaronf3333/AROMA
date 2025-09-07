@@ -691,7 +691,7 @@ $conn->close();
                             data-nombre="<?php echo htmlspecialchars($row['nombres'] . ' ' . $row['apellidos']); ?>"
                             data-nombres="<?php echo htmlspecialchars($row['nombres']); ?>"
                             data-apellidos="<?php echo htmlspecialchars($row['apellidos']); ?>"
-                            data-documento="<?php echo htmlspecialchars($row['tipoDocumento'] . ' ' . $row['numeroDocumento']); ?>"
+                            data-documento="<?php echo htmlspecialchars($row['tipoDocumento'] . ' ' . $row['numeroDocumento'] ?? ''); ?>"
                             data-direccion="<?php echo htmlspecialchars($row['direccion']); ?>"
                             data-telefono="<?php echo htmlspecialchars($row['telefono']); ?>"
                             data-estado="<?php echo $row['activo'] ? 'activo' : 'inactivo'; ?>">
@@ -699,7 +699,7 @@ $conn->close();
                             <td data-label="Nombres" class="nombres-cell"><?php echo htmlspecialchars($row['nombres']); ?></td>
                             <td data-label="Apellidos" class="apellidos-cell"><?php echo htmlspecialchars($row['apellidos']); ?></td>
                             <td data-label="Tipo Doc." class="tipo-doc-cell"><?php echo htmlspecialchars($row['tipoDocumento']); ?></td>
-                            <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento']); ?></td>
+                            <td data-label="Número Doc." class="numero-doc-cell"><?php echo htmlspecialchars($row['numeroDocumento'] ?? ''); ?></td>
                             <td data-label="Dirección" class="direccion-cell"><?php echo htmlspecialchars($row['direccion']); ?></td>
                             <td data-label="Teléfono" class="telefono-cell"><?php echo htmlspecialchars($row['telefono']); ?></td>
                             <td data-label="Estado / Acciones">
