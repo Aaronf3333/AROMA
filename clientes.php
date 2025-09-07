@@ -31,7 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nombres'])) {
         exit();
     }
 
-    // Si el tipo de documento es 'Indocumentado', el número de documento debe estar vacío.
+    // Si el tipo de documento es 'Indocumentado', el número de documento debe ser nulo o vacío
+    // para evitar conflictos con UNIQUE KEY.
     if ($tipoDocumento === 'Indocumentado') {
         $numeroDocumento = '0'; 
     }
@@ -170,7 +171,7 @@ $conn->close();
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clientes - Aroma S.A.C</title>
 <style>
-/* ... (El resto de tus estilos CSS se mantienen igual) ... */
+/* ... (Tu CSS se mantiene igual, no es necesario modificarlo) ... */
 :root {
 --primary-color: #3b3b98;
 --secondary-color: #575fcf;
@@ -694,6 +695,8 @@ setTimeout(() => { toast.classList.remove('show'); }, 4000);
                 data-nombre="<?php echo htmlspecialchars($row['nombres'] . ' ' . $row['apellidos']); ?>"
                 data-nombres="<?php echo htmlspecialchars($row['nombres']); ?>"
                 data-apellidos="<?php echo htmlspecialchars($row['apellidos']); ?>"
+                data-tipodoc="<?php echo htmlspecialchars($row['tipoDocumento']); ?>"
+                data-numerodoc="<?php echo htmlspecialchars($row['numeroDocumento']); ?>"
                 data-documento="<?php echo htmlspecialchars($row['tipoDocumento'] . ' ' . $row['numeroDocumento']); ?>"
                 data-direccion="<?php echo htmlspecialchars($row['direccion']); ?>"
                 data-telefono="<?php echo htmlspecialchars($row['telefono']); ?>"
