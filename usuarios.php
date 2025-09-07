@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
     $nombres = $_POST['nombres'];
     $apellidos = $_POST['apellidos'];
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = $_POST['numeroDocumento'];
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
     $direccion = $_POST['direccion'];
     $telefono = $_POST['telefono'];
     $usuario = $_POST['usuario'];
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
     $nombres = $_POST['nombres'];
     $apellidos = $_POST['apellidos'];
     $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = $_POST['numeroDocumento'];
+    $numeroDocumento = isset($_POST['numeroDocumento']) ? $_POST['numeroDocumento'] : '';
     $usuario = $_POST['usuario'];
     $contrasena = $_POST['contrasena'];
     $direccion = $_POST['direccion'];
@@ -105,8 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
 // OBTENER USUARIOS Y ROLES
 // ------------------
 $sqlUsuarios = "SELECT u.idUsuario, u.usuario, u.contrasena, u.idRol, r.nombreRol, 
-                       p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
-                       p.direccion, p.telefono, p.idPersona
+                        p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
+                        p.direccion, p.telefono, p.idPersona
                 FROM usuario u
                 INNER JOIN rol r ON u.idRol = r.idRol
                 INNER JOIN persona p ON u.idPersona = p.idPersona
@@ -491,6 +491,12 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+input:disabled {
+    background: #f1f3f4;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
 /* Toast Notifications */
 .toast-container {
     position: fixed;
@@ -827,7 +833,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         </div>
     </div>
 
-    <!-- Modal Nuevo Usuario -->
     <div class="modal" id="modalNuevo">
         <div class="modal-content">
             <div class="modal-header">
@@ -854,16 +859,17 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                 <div class="form-row">
                     <div class="form-group">
                         <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                        <select name="tipoDocumento" required>
+                        <select name="tipoDocumento" id="nuevo_tipoDocumento" required>
                             <option value="">Seleccionar tipo</option>
                             <option value="DNI">DNI</option>
                             <option value="CE">Carnet de Extranjería</option>
+                            <option value="IND">Indocumentado</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
                         <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                        <input type="text" name="numeroDocumento" required placeholder="Ingrese el número">
+                        <input type="text" name="numeroDocumento" id="nuevo_numeroDocumento" required placeholder="Ingrese el número">
                     </div>
                 </div>
                 
@@ -906,7 +912,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         </div>
     </div>
 
-    <!-- Modal Editar Usuario -->
     <div class="modal" id="modalEditar">
         <div class="modal-content">
             <div class="modal-header">
@@ -938,6 +943,7 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                             <option value="">Seleccionar tipo</option>
                             <option value="DNI">DNI</option>
                             <option value="CE">Carnet de Extranjería</option>
+                            <option value="IND">Indocumentado</option>
                         </select>
                     </div>
                     
@@ -1077,16 +1083,11 @@ function abrirModalEditar(userData) {
     document.getElementById('edit_contrasena').value = userData.contrasena;
     document.getElementById('edit_idRol').value = userData.idRol;
     
+    // Aplicar la lógica de validación al abrir el modal de edición
+    toggleDocumentoRequired('edit', userData.tipoDocumento);
+
     currentModal.classList.add('show');
     document.body.style.overflow = 'hidden';
-
-    // Enfocar el primer campo
-    setTimeout(() => {
-        const firstInput = currentModal.querySelector('input[name="nombres"]');
-        if (firstInput) {
-            firstInput.focus();
-        }
-    }, 200);
 }
 
 function cerrarModal() {
@@ -1140,10 +1141,42 @@ function showLoadingModal(form) {
 // Mostrar toast si hay mensaje en sesión
 <?php if (isset($_SESSION['toast_message'])): ?>
 showToast('<?php echo addslashes($_SESSION['toast_message']); ?>', '<?php echo $_SESSION['toast_type']; ?>');
-<?php 
+<?php
 unset($_SESSION['toast_message']);
 unset($_SESSION['toast_type']);
 endif; ?>
+
+// Función para controlar la obligatoriedad del campo de documento
+function toggleDocumentoRequired(modalType, tipoDocumento) {
+    let numeroDocumentoInput;
+    if (modalType === 'nuevo') {
+        numeroDocumentoInput = document.getElementById('nuevo_numeroDocumento');
+    } else if (modalType === 'edit') {
+        numeroDocumentoInput = document.getElementById('edit_numeroDocumento');
+    }
+
+    if (numeroDocumentoInput) {
+        if (tipoDocumento === 'IND') {
+            numeroDocumentoInput.value = ''; // Limpiar el campo
+            numeroDocumentoInput.placeholder = 'No requerido';
+            numeroDocumentoInput.disabled = true;
+            numeroDocumentoInput.removeAttribute('required');
+        } else {
+            numeroDocumentoInput.placeholder = 'Ingrese el número';
+            numeroDocumentoInput.disabled = false;
+            numeroDocumentoInput.setAttribute('required', 'required');
+        }
+    }
+}
+
+// Event listeners para los select de tipo de documento
+document.getElementById('nuevo_tipoDocumento').addEventListener('change', function() {
+    toggleDocumentoRequired('nuevo', this.value);
+});
+
+document.getElementById('edit_tipoDocumento').addEventListener('change', function() {
+    toggleDocumentoRequired('edit', this.value);
+});
 
 // Validación mejorada para formularios
 document.querySelectorAll('form').forEach(form => {
