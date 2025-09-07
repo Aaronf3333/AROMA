@@ -50,8 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $validacionExitosa = true;
     foreach ($productosSeleccionados as $idProd => $cantData) {
         // Solución al error: verificar si la clave 'cantidad' existe antes de acceder a ella
-        if (!isset($cantData['cantidad'])) {
-            continue; // Ignora este producto y pasa al siguiente
+        // También se valida que sea un valor numérico y mayor a 0
+        if (!isset($cantData['cantidad']) || !is_numeric($cantData['cantidad']) || intval($cantData['cantidad']) <= 0) {
+            $validacionExitosa = false;
+            break;
         }
         
         $cantidad = intval($cantData['cantidad']);
