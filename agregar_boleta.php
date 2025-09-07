@@ -375,6 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .form-group {
             margin-bottom: 20px;
+            width: 100%; /* Aseguramos que ocupe todo el ancho disponible */
         }
         .form-label {
             display: block;
@@ -411,6 +412,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: rgba(245, 246, 250, 0.5);
             border-radius: 12px;
             border: 2px solid var(--border-color);
+            width: 100%; /* Ajuste para que ocupe todo el ancho */
         }
         .product-item {
             display: flex;
