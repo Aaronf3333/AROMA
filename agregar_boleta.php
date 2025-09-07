@@ -1,1288 +1,844 @@
 <?php
 session_start();
 include(__DIR__ . "/conexion.php");
+require(__DIR__ . "/fpdf/fpdf.php");
 
 if (!isset($_SESSION['idUsuario'])) {
     header("Location: login.php");
     exit();
 }
 
-// ------------------
-// PROCESAR NUEVO USUARIO
-// ------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nuevo'])) {
-    $nombres = $_POST['nombres'];
-    $apellidos = $_POST['apellidos'];
-    $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = $_POST['numeroDocumento'];
-    $direccion = $_POST['direccion'];
-    $telefono = $_POST['telefono'];
-    $usuario = $_POST['usuario'];
-    $contrasena = $_POST['contrasena'];
-    $idRol = intval($_POST['idRol']);
+$idUsuario = $_SESSION['idUsuario'];
+$usuarioNombre = $_SESSION['nombres'] . ' ' . $_SESSION['apellidos'];
+$mensaje = $_SESSION['mensaje'] ?? '';
+$tipoMensaje = $_SESSION['tipo'] ?? '';
+unset($_SESSION['mensaje'], $_SESSION['tipo']);
 
-    $conn->begin_transaction();
+// Obtener clientes activos
+$sqlClientes = "SELECT c.idCliente, p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento
+                FROM cliente c
+                JOIN persona p ON c.idPersona = p.idPersona
+                WHERE c.activo = 1
+                ORDER BY p.nombres ASC";
+$resultClientes = mysqli_query($conn, $sqlClientes);
 
-    try {
-        $sqlPersona = "INSERT INTO persona (nombres, apellidos, tipoDocumento, numeroDocumento, direccion, telefono) 
-                       VALUES (?, ?, ?, ?, ?, ?)";
-        $stmtPersona = $conn->prepare($sqlPersona);
-        $stmtPersona->bind_param("ssssss", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono);
-        $stmtPersona->execute();
+// Obtener productos activos
+$sqlProductos = "SELECT idProducto, nombreProducto, precio FROM producto WHERE estado=1 ORDER BY nombreProducto ASC";
+$resultProductos = mysqli_query($conn, $sqlProductos);
 
-        $idPersona = $conn->insert_id;
+// -------------------------
+// PROCESAR VENTA
+// -------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $idCliente = isset($_POST['idCliente']) ? intval($_POST['idCliente']) : null;
+    $productosSeleccionados = $_POST['productos'] ?? [];
+    $montoPagado = isset($_POST['monto_pagado']) ? floatval($_POST['monto_pagado']) : 0;
+    $cambio = isset($_POST['cambio_hidden']) ? floatval($_POST['cambio_hidden']) : 0;
+    $total = 0;
+    $detalleProductos = [];
 
-        $sqlUsuario = "INSERT INTO usuario (usuario, contrasena, idPersona, idRol) VALUES (?, ?, ?, ?)";
-        $stmtUsuario = $conn->prepare($sqlUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idPersona, $idRol);
-        $stmtUsuario->execute();
-
-        $conn->commit();
-        $_SESSION['toast_message'] = "Usuario creado correctamente";
-        $_SESSION['toast_type'] = 'success';
-    } catch (mysqli_sql_exception $e) {
-        $conn->rollback();
-        $_SESSION['toast_message'] = "Error al crear usuario. Por favor, intente de nuevo. Error: " . $e->getMessage();
-        $_SESSION['toast_type'] = 'error';
+    // Validaciones iniciales
+    if ($idCliente === null || empty($productosSeleccionados)) {
+        $_SESSION['mensaje'] = "Error: Por favor, seleccione un cliente y al menos un producto.";
+        $_SESSION['tipo'] = "warning";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
     }
-    
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit();
-}
 
-// ------------------
-// PROCESAR EDICIÓN
-// ------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar'])) {
-    $idUsuario = intval($_POST['idUsuario']);
-    $nombres = $_POST['nombres'];
-    $apellidos = $_POST['apellidos'];
-    $tipoDocumento = $_POST['tipoDocumento'];
-    $numeroDocumento = $_POST['numeroDocumento'];
-    $usuario = $_POST['usuario'];
-    $contrasena = $_POST['contrasena'];
-    $direccion = $_POST['direccion'];
-    $telefono = $_POST['telefono'];
-    $idRol = intval($_POST['idRol']);
+    $validacionExitosa = true;
+    foreach ($productosSeleccionados as $idProd => $cantData) {
+        $cantidad = intval($cantData['cantidad']);
+        $precioUnitario = floatval($cantData['precioUnitario']);
 
-    $conn->begin_transaction();
+        if ($cantidad <= 0 || $precioUnitario <= 0) {
+            $validacionExitosa = false;
+            break;
+        }
 
-    try {
-        // Actualizar usuario
-        $sqlUpdateUsuario = "UPDATE usuario SET usuario = ?, contrasena = ?, idRol = ? WHERE idUsuario = ?";
-        $stmtUsuario = $conn->prepare($sqlUpdateUsuario);
-        $stmtUsuario->bind_param("ssii", $usuario, $contrasena, $idRol, $idUsuario);
-        $stmtUsuario->execute();
-
-        // Obtener idPersona
-        $sqlIdPersona = "SELECT idPersona FROM usuario WHERE idUsuario = ?";
-        $stmtIdPersona = $conn->prepare($sqlIdPersona);
-        $stmtIdPersona->bind_param("i", $idUsuario);
-        $stmtIdPersona->execute();
-        $resultIdPersona = $stmtIdPersona->get_result();
-        $idPersona = $resultIdPersona->fetch_assoc()['idPersona'];
-
-        // Actualizar persona
-        $sqlUpdatePersona = "UPDATE persona SET nombres = ?, apellidos = ?, tipoDocumento = ?, numeroDocumento = ?, direccion = ?, telefono = ? WHERE idPersona = ?";
-        $stmtPersona = $conn->prepare($sqlUpdatePersona);
-        $stmtPersona->bind_param("ssssssi", $nombres, $apellidos, $tipoDocumento, $numeroDocumento, $direccion, $telefono, $idPersona);
-        $stmtPersona->execute();
-
-        $conn->commit();
-        $_SESSION['toast_message'] = "Usuario actualizado correctamente";
-        $_SESSION['toast_type'] = 'success';
-    } catch (mysqli_sql_exception $e) {
-        $conn->rollback();
-        $_SESSION['toast_message'] = "Error al actualizar. Por favor, intente de nuevo. Error: " . $e->getMessage();
-        $_SESSION['toast_type'] = 'error';
+        $subtotal = $cantidad * $precioUnitario;
+        $total += $subtotal;
+        $detalleProductos[$idProd] = [
+            'cantidad' => $cantidad,
+            'precioUnitario' => $precioUnitario,
+            'nombre' => htmlspecialchars($cantData['nombre'])
+        ];
     }
-    
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit();
-}
 
-// ------------------
-// OBTENER USUARIOS Y ROLES
-// ------------------
-$sqlUsuarios = "SELECT u.idUsuario, u.usuario, u.contrasena, u.idRol, r.nombreRol, 
-                       p.nombres, p.apellidos, p.tipoDocumento, p.numeroDocumento, 
-                       p.direccion, p.telefono, p.idPersona
-                FROM usuario u
-                INNER JOIN rol r ON u.idRol = r.idRol
-                INNER JOIN persona p ON u.idPersona = p.idPersona
-                ORDER BY u.idUsuario ASC";
-$resultUsuarios = $conn->query($sqlUsuarios);
+    if (!$validacionExitosa) {
+        $_SESSION['mensaje'] = "Error: La cantidad y el precio del producto deben ser mayores a cero.";
+        $_SESSION['tipo'] = "warning";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
 
-$sqlRoles = "SELECT idRol, nombreRol FROM rol ORDER BY idRol ASC";
-$resultRoles = $conn->query($sqlRoles);
-$roles = [];
-while($r = $resultRoles->fetch_assoc()){
-    $roles[] = $r;
+    // Iniciar una transacción
+    mysqli_begin_transaction($conn);
+    try {
+        // 1. Insertar Venta
+        $sqlVenta = "INSERT INTO venta (idUsuario, idCliente, total) VALUES (?, ?, ?)";
+        $stmtVenta = mysqli_prepare($conn, $sqlVenta);
+        if (!$stmtVenta) throw new Exception("Error al preparar venta: " . mysqli_error($conn));
+        
+        $idClienteDB = ($idCliente == 0) ? null : $idCliente;
+        mysqli_stmt_bind_param($stmtVenta, "iid", $idUsuario, $idClienteDB, $total);
+        mysqli_stmt_execute($stmtVenta);
+        $idVenta = mysqli_insert_id($conn);
+        mysqli_stmt_close($stmtVenta);
+
+        // 2. Insertar Detalle de Venta
+        $sqlDetalle = "INSERT INTO detalleventa (idVenta, idProducto, cantidad, precioUnitario) VALUES (?, ?, ?, ?)";
+        $stmtDetalle = mysqli_prepare($conn, $sqlDetalle);
+        if (!$stmtDetalle) throw new Exception("Error al preparar detalle: " . mysqli_error($conn));
+        foreach ($detalleProductos as $idProd => $data) {
+            mysqli_stmt_bind_param($stmtDetalle, "iiid", $idVenta, $idProd, $data['cantidad'], $data['precioUnitario']);
+            mysqli_stmt_execute($stmtDetalle);
+        }
+        mysqli_stmt_close($stmtDetalle);
+
+        // 3. Generar PDF (código FPDF)
+        $pdf = new FPDF('P', 'mm', array(80, 200));
+        $pdf->AddPage();
+        $pdf->SetMargins(3, 5, 3);
+        $pdf->SetAutoPageBreak(true, 10);
+        $anchoEfectivo = 74;
+
+        // Encabezado
+        $pdf->SetFillColor(60, 60, 60);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->Rect(3, 5, $anchoEfectivo, 13, 'F');
+        $pdf->SetXY(3, 6);
+        $pdf->Cell($anchoEfectivo, 7, 'NOTA DE VENTA', 0, 1, 'C', false);
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetX(3);
+        $pdf->Cell($anchoEfectivo, 6, 'Aroma S.A.C', 0, 1, 'C', false);
+
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->Ln(3);
+        $pdf->Cell($anchoEfectivo, 4, 'Cajero: ' . $usuarioNombre, 0, 1, 'C');
+        $pdf->Ln(1);
+
+        $ruc = "10345678901";
+        $numeroBoleta = 'BOL' . str_pad($idVenta, 5, '0', STR_PAD_LEFT);
+        $pdf->Cell($anchoEfectivo, 4, 'RUC: ' . $ruc, 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, 'Nro: ' . $numeroBoleta, 0, 1, 'C');
+
+        date_default_timezone_set('America/Lima');
+        $fechaEmision = date('d/m/Y H:i:s');
+        $pdf->Cell($anchoEfectivo, 4, 'Fecha: ' . $fechaEmision, 0, 1, 'C');
+
+        $pdf->Ln(5);
+
+        // Info cliente
+        if ($idCliente == 0) {
+            $clienteNombre = "Cliente Indocumentado";
+            $clienteDoc = "N/A: -----";
+        } else {
+            $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
+            $stmtCliente = mysqli_prepare($conn, $sqlCliente);
+            mysqli_stmt_bind_param($stmtCliente, "i", $idCliente);
+            mysqli_stmt_execute($stmtCliente);
+            $resultCliente = mysqli_stmt_get_result($stmtCliente);
+            $cliente = mysqli_fetch_assoc($resultCliente);
+            mysqli_stmt_close($stmtCliente);
+            $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
+            $clienteDoc = $cliente['tipoDocumento'] . ': ' . $cliente['numeroDocumento'];
+        }
+
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->Cell($anchoEfectivo, 5, 'CLIENTE', 0, 1, 'L');
+        $pdf->Ln(1);
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->Cell($anchoEfectivo, 4, $clienteNombre, 0, 1, 'L');
+        $pdf->Ln(1);
+        $pdf->Cell($anchoEfectivo, 4, $clienteDoc, 0, 1, 'L');
+        if (isset($cliente['direccion']) && !empty($cliente['direccion'])) {
+            $pdf->Ln(1);
+            $pdf->Cell($anchoEfectivo, 4, 'Dir: ' . $cliente['direccion'], 0, 1, 'L');
+        }
+        if (isset($cliente['telefono']) && !empty($cliente['telefono'])) {
+            $pdf->Ln(1);
+            $pdf->Cell($anchoEfectivo, 4, 'Tel: ' . $cliente['telefono'], 0, 1, 'L');
+        }
+        $pdf->Ln(5);
+
+        // TABLA PRODUCTOS
+        $anchoProducto = 38;
+        $anchoCantidad = 10;
+        $anchoPrecio = 13;
+        $anchoSubtotal = 13;
+
+        $pdf->SetFillColor(230, 230, 230);
+        $pdf->SetFont('Arial', 'B', 7);
+        $pdf->Cell($anchoProducto, 6, 'PRODUCTO', 1, 0, 'C', true);
+        $pdf->Cell($anchoCantidad, 6, 'CANT', 1, 0, 'C', true);
+        $pdf->Cell($anchoPrecio, 6, 'PRECIO', 1, 0, 'C', true);
+        $pdf->Cell($anchoSubtotal, 6, 'TOTAL', 1, 1, 'C', true);
+
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->SetFillColor(248, 248, 248);
+        $alternar = false;
+
+        foreach ($detalleProductos as $data) {
+            $nombreProducto = $data['nombre'];
+            if (strlen($nombreProducto) > 22) {
+                $nombreProducto = substr($nombreProducto, 0, 19) . '...';
+            }
+            $pdf->Cell($anchoProducto, 6, $nombreProducto, 1, 0, 'L', $alternar);
+            $pdf->Cell($anchoCantidad, 6, $data['cantidad'], 1, 0, 'C', $alternar);
+            $pdf->Cell($anchoPrecio, 6, 'S/ ' . number_format($data['precioUnitario'], 2), 1, 0, 'R', $alternar);
+            $pdf->Cell($anchoSubtotal, 6, 'S/ ' . number_format($data['cantidad'] * $data['precioUnitario'], 2), 1, 1, 'R', $alternar);
+            $alternar = !$alternar;
+        }
+
+        $pdf->Ln(4);
+        $pdf->SetDrawColor(200, 200, 200);
+        $pdf->Line(3, $pdf->GetY(), 77, $pdf->GetY());
+        $pdf->Ln(4);
+
+        // TOTAL
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetFillColor(60, 60, 60);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $anchoTextoTotal = $anchoEfectivo - 20;
+        $pdf->Cell($anchoTextoTotal, 8, 'TOTAL A PAGAR', 1, 0, 'C', true);
+        $pdf->Cell(20, 8, 'S/ ' . number_format($total, 2), 1, 1, 'R', true);
+
+        // Sección de pago
+        $pdf->Ln(5);
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->Cell($anchoEfectivo, 5, 'DETALLE DE PAGO', 0, 1, 'L');
+        $pdf->Ln(1);
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->Cell($anchoEfectivo / 2, 4, 'Monto Pagado:', 0, 0, 'L');
+        $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($montoPagado, 2), 0, 1, 'R');
+
+        $pdf->Cell($anchoEfectivo / 2, 4, 'Cambio:', 0, 0, 'L');
+        $pdf->Cell($anchoEfectivo / 2, 4, 'S/ ' . number_format($cambio, 2), 0, 1, 'R');
+
+        // Pie
+        $pdf->Ln(6);
+        $pdf->SetFont('Arial', 'I', 7);
+        $pdf->SetTextColor(100, 100, 100);
+        $pdf->Cell($anchoEfectivo, 4, utf8_decode('¡Gracias por su compra!'), 0, 1, 'C');
+        $pdf->Ln(1);
+        $pdf->Cell($anchoEfectivo, 4, 'www.aromasac.com', 0, 1, 'C');
+        $pdf->Ln(3);
+
+        // NOTA LEGAL
+        $pdf->SetFont('Arial', 'B', 7);
+        $pdf->SetTextColor(170, 170, 170);
+        $pdf->Cell($anchoEfectivo, 4, utf8_decode('Esta nota no tiene valor tributario.'), 0, 1, 'C');
+        $pdf->Cell($anchoEfectivo, 4, utf8_decode('Solicite su Boleta de Venta o Factura.'), 0, 1, 'C');
+
+        $pdfContent = $pdf->Output('S');
+
+        // Guardar en MySQL como BLOB
+        $sqlBoleta = "INSERT INTO boleta (idVenta, numeroBoleta, archivoPDF) VALUES (?, ?, ?)";
+        $stmtBoleta = mysqli_prepare($conn, $sqlBoleta);
+        if (!$stmtBoleta) throw new Exception("Error al preparar boleta: " . mysqli_error($conn));
+        mysqli_stmt_bind_param($stmtBoleta, "iss", $idVenta, $numeroBoleta, $pdfContent);
+        
+        $null = NULL;
+        mysqli_stmt_send_long_data($stmtBoleta, 2, $pdfContent);
+        
+        if (!mysqli_stmt_execute($stmtBoleta)) {
+            throw new Exception("Error al insertar boleta: " . mysqli_stmt_error($stmtBoleta));
+        }
+        mysqli_stmt_close($stmtBoleta);
+
+        mysqli_commit($conn);
+
+        $_SESSION['mensaje'] = "Boleta generada correctamente.";
+        $_SESSION['tipo'] = "success";
+
+        header("Location: boletas.php");
+        exit();
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        $_SESSION['mensaje'] = "Error en la transacción: " . $e->getMessage();
+        $_SESSION['tipo'] = "warning";
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestión de Usuarios - Aroma S.A.C</title>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-<style>
-/* Variables CSS para colores consistentes */
-:root {
-    --primary-color: #667eea;
-    --primary-dark: #5a67d8;
-    --success-color: #48bb78;
-    --error-color: #f56565;
-    --warning-color: #ed8936;
-    --background-color: #f7fafc;
-    --card-background: #ffffff;
-    --text-primary: #2d3748;
-    --text-secondary: #718096;
-    --border-color: #e2e8f0;
-    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    color: var(--text-primary);
-    line-height: 1.6;
-}
-
-.main-wrapper {
-    min-height: 100vh;
-    padding: 20px;
-}
-
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    background: var(--card-background);
-    border-radius: 20px;
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    backdrop-filter: blur(10px);
-}
-
-.header-section {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-    color: white;
-    padding: 2rem;
-    text-align: center;
-    position: relative;
-}
-
-.header-section::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #48bb78, #667eea, #f56565);
-}
-
-.header-section h2 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-.header-section p {
-    opacity: 0.9;
-    font-size: 1.1rem;
-}
-
-.content-section {
-    padding: 2rem;
-}
-
-.action-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.search-section {
-    flex: 1;
-    min-width: 300px;
-}
-
-.search-section h3 {
-    margin-bottom: 0.5rem;
-    color: var(--text-primary);
-}
-
-.search-section p {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
-
-#searchInput {
-    width: 100%;
-    max-width: 400px;
-    padding: 12px 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-}
-
-#searchInput:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.btn-success {
-    background: linear-gradient(135deg, var(--success-color), #38a169);
-    color: white;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-}
-
-.btn-success:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
-}
-
-.btn-warning {
-    background: linear-gradient(135deg, var(--warning-color), #d69e2e);
-    color: white;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-}
-
-.btn-warning:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(237, 137, 54, 0.4);
-}
-
-/* Responsive Table Styles */
-.responsive-table-container {
-    background: white;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    border: 1px solid var(--border-color);
-}
-
-.table-wrapper {
-    overflow-x: auto;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 800px;
-}
-
-thead {
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-}
-
-th {
-    padding: 1.2rem 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-primary);
-    border-bottom: 2px solid var(--border-color);
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-}
-
-td {
-    padding: 1rem;
-    border-bottom: 1px solid #f1f3f4;
-    vertical-align: middle;
-}
-
-tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-tbody tr:hover {
-    background-color: #f8f9fa;
-}
-
-.user-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.user-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 2px;
-}
-
-.user-detail {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.badge {
-    display: inline-block;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
-    color: white;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: baseline;
-    border-radius: 0.5rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-}
-
-.actions-cell {
-    white-space: nowrap;
-}
-
-/* Modal Styles */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 1000;
-    backdrop-filter: blur(5px);
-}
-
-.modal.show {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: modalFadeIn 0.3s ease;
-}
-
-@keyframes modalFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 20px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from { transform: translateY(-50px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid var(--border-color);
-}
-
-.modal-header h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.close {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: #f1f3f4;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    transition: all 0.2s ease;
-}
-
-.close:hover {
-    background: var(--error-color);
-    color: white;
-    transform: scale(1.1);
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-input[type="text"], input[type="password"], select {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    background: white;
-}
-
-input[type="text"]:focus, input[type="password"]:focus, select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-/* Toast Notifications */
-.toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.toast {
-    background: white;
-    padding: 16px 20px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    border-left: 4px solid;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.toast.success {
-    border-left-color: var(--success-color);
-    background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
-}
-
-.toast.error {
-    border-left-color: var(--error-color);
-    background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
-}
-
-.toast-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-}
-
-.toast.success .toast-icon {
-    background: var(--success-color);
-}
-
-.toast.error .toast-icon {
-    background: var(--error-color);
-}
-
-.toast-content {
-    flex: 1;
-}
-
-.toast-title {
-    font-weight: 600;
-    margin-bottom: 2px;
-    font-size: 0.9rem;
-}
-
-.toast-message {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-}
-
-.toast-close {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    color: var(--text-secondary);
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.toast-close:hover {
-    background: rgba(0,0,0,0.1);
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutRight {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-}
-
-.toast.hiding {
-    animation: slideOutRight 0.3s ease;
-}
-
-.toast-progress {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 3px;
-    background: rgba(0,0,0,0.2);
-    animation: progressBar 5s linear;
-}
-
-.toast.success .toast-progress {
-    background: var(--success-color);
-}
-
-.toast.error .toast-progress {
-    background: var(--error-color);
-}
-
-@keyframes progressBar {
-    from { width: 100%; }
-    to { width: 0%; }
-}
-
-.loading {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(255,255,255,.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-    .container {
-        margin: 10px;
-        border-radius: 16px;
-    }
-    
-    .content-section {
-        padding: 1.5rem;
-    }
-}
-
-@media (max-width: 768px) {
-    .main-wrapper {
-        padding: 10px;
-    }
-    
-    .header-section {
-        padding: 1.5rem 1rem;
-    }
-    
-    .header-section h2 {
-        font-size: 2rem;
-    }
-    
-    .content-section {
-        padding: 1rem;
-    }
-    
-    .action-bar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .search-section {
-        min-width: auto;
-    }
-    
-    #searchInput {
-        max-width: none;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .responsive-table-container {
-        border-radius: 12px;
-    }
-    
-    .table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    table {
-        font-size: 0.85rem;
-    }
-    
-    th, td {
-        padding: 0.75rem 0.5rem;
-    }
-    
-    .btn {
-        padding: 8px 12px;
-        font-size: 0.8rem;
-    }
-    
-    .modal-content {
-        margin: 10px;
-        width: calc(100% - 20px);
-        padding: 1.5rem;
-        max-height: calc(100vh - 40px);
-    }
-    
-    .toast {
-        min-width: auto;
-        margin: 0 10px;
-    }
-}
-
-@media (max-width: 480px) {
-    .header-section h2 {
-        font-size: 1.75rem;
-    }
-    
-    table {
-        font-size: 0.8rem;
-    }
-    
-    th, td {
-        padding: 0.5rem 0.25rem;
-    }
-    
-    .user-info {
-        font-size: 0.85rem;
-    }
-    
-    .actions-cell {
-        min-width: 100px;
-    }
-    
-    .btn {
-        padding: 6px 10px;
-        font-size: 0.75rem;
-        gap: 4px;
-    }
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Boleta - Aroma S.A.C</title>
+    <style>
+        :root {
+            --primary-color: #00b894;
+            --secondary-color: #00e676;
+            --text-dark: #2d3436;
+            --text-light: #6c757d;
+            --bg-light: #f5f6fa;
+            --bg-card: rgba(255, 255, 255, 0.95);
+            --border-color: #e9ecef;
+            --shadow-light: 0 5px 20px rgba(0, 0, 0, 0.05);
+            --shadow-strong: 0 10px 40px rgba(0, 0, 0, 0.08);
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .main-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: var(--shadow-strong);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+        .main-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--primary-color));
+        }
+        .page-title {
+            color: var(--text-dark);
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .page-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 2px;
+        }
+        .section-title {
+            color: var(--primary-color);
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-section {
+            margin-bottom: 35px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 184, 148, 0.1);
+            background: rgba(255, 255, 255, 1);
+        }
+        .products-list {
+            display: grid;
+            gap: 15px;
+            max-height: 450px;
+            overflow-y: auto;
+            padding: 15px;
+            background: rgba(245, 246, 250, 0.5);
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+        }
+        .product-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow-light);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .product-item:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .product-item.selected {
+            border-color: var(--primary-color);
+            background: rgba(0, 184, 148, 0.05);
+        }
+        .product-checkbox {
+            min-width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+        .product-details {
+            flex-grow: 1;
+        }
+        .product-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 15px;
+        }
+        .product-price {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .product-quantity {
+            width: 80px;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .product-quantity:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 184, 148, 0.1);
+        }
+        .product-quantity:disabled {
+            background: #f8f9fa;
+            color: var(--text-light);
+            cursor: not-allowed;
+        }
+        .summary-panel {
+            background: rgba(0, 184, 148, 0.1);
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+            border: 2px solid rgba(0, 184, 148, 0.2);
+            display: none;
+        }
+        .summary-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed rgba(0, 184, 148, 0.3);
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        .total-row {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            padding-top: 15px;
+        }
+        .payment-panel {
+            background: #f8f9fa;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .payment-panel h4 {
+            color: var(--text-dark);
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+        }
+        .payment-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .payment-info #cambioAmount {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+        }
+        .btn-submit {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 18px 40px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 20px rgba(0, 184, 148, 0.3);
+            width: 100%;
+            margin-top: 30px;
+        }
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4);
+        }
+        .btn-submit:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s ease;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .toast.success {
+            background-color: #4CAF50;
+        }
+        .toast.warning {
+            background-color: #ff9800;
+        }
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        .search-container #clienteSearch {
+            width: 100%;
+            padding-right: 40px;
+        }
+        .search-container #search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #b0bec5;
+        }
+        #clienteList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+        }
+        #clienteList li {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+        #clienteList li:last-child {
+            border-bottom: none;
+        }
+        #clienteList li:hover {
+            background-color: var(--bg-light);
+        }
+    </style>
 </head>
 <body>
-<div class="main-wrapper">
     <?php include(__DIR__ . "/includes/header.php"); ?>
 
     <div class="container">
-        <div class="header-section">
-            <h2><i class="fas fa-users-cog"></i> Gestión de Usuarios</h2>
-            <p>Administra los usuarios del sistema de manera eficiente</p>
-        </div>
-
-        <div class="content-section">
-            <div class="action-bar">
-                <div class="search-section">
-                    <h3>Lista de Usuarios</h3>
-                    <p>Gestiona y edita los usuarios existentes</p>
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre, correo, dirección...">
-                </div>
-                <button class="btn btn-primary" onclick="abrirModal('nuevo')">
-                    <i class="fas fa-user-plus"></i> Agregar Usuario
-                </button>
+        <h1 class="page-title">💼 Generar Nueva Boleta</h1>
+        
+        <?php if ($mensaje): ?>
+            <div class="toast show <?php echo htmlspecialchars($tipoMensaje); ?>" style="position: static; transform: none; margin-bottom: 20px; opacity: 1; visibility: visible;">
+                <?php echo htmlspecialchars($mensaje); ?>
             </div>
+        <?php endif; ?>
 
-            <div class="responsive-table-container">
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th><i class="fas fa-hashtag"></i> ID</th>
-                                <th><i class="fas fa-user"></i> Usuario</th>
-                                <th><i class="fas fa-id-card"></i> Documento</th>
-                                <th><i class="fas fa-map-marker-alt"></i> Dirección</th>
-                                <th><i class="fas fa-phone"></i> Teléfono</th>
-                                <th><i class="fas fa-user-tag"></i> Rol</th>
-                                <th><i class="fas fa-cogs"></i> Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userTableBody">
-                            <?php 
-                            if ($resultUsuarios && $resultUsuarios->num_rows > 0) {
-                                while($row = $resultUsuarios->fetch_assoc()): ?>
-                                <tr>
-                                    <td><strong><?php echo $row['idUsuario']; ?></strong></td>
-                                    <td>
-                                        <div class="user-info">
-                                            <div class="user-name"><?php echo htmlspecialchars($row['nombres'].' '.$row['apellidos']); ?></div>
-                                            <div class="user-detail"><?php echo htmlspecialchars($row['usuario']); ?></div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="user-info">
-                                            <div class="user-name"><?php echo htmlspecialchars($row['tipoDocumento']); ?></div>
-                                            <div class="user-detail">
-                                                <?php echo htmlspecialchars(!empty($row['numeroDocumento']) ? $row['numeroDocumento'] : '-----'); ?>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><?php echo htmlspecialchars($row['direccion']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['telefono']); ?></td>
-                                    <td>
-                                        <span class="badge">
-                                            <?php echo htmlspecialchars($row['nombreRol']); ?>
-                                        </span>
-                                    </td>
-                                    <td class="actions-cell">
-                                        <button class="btn btn-warning" onclick="abrirModalEditar(<?php echo htmlspecialchars(json_encode($row)); ?>)">
-                                            <i class="fas fa-edit"></i> Editar
-                                        </button>
-                                    </td>
-                                </tr>
-                                <?php endwhile; 
-                            } else {
-                                echo "<tr><td colspan='7' style='text-align: center; padding: 2rem;'>No se encontraron usuarios.</td></tr>";
-                            }
-                            ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="modalNuevo">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user-plus"></i> Agregar Nuevo Usuario</h3>
-                <button class="close" onclick="cerrarModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <form method="POST" onsubmit="showLoadingModal(this)">
-                <input type="hidden" name="nuevo" value="1">
-                
-                <div class="form-row">
+        <div class="main-card">
+            <form method="POST" id="formBoleta">
+                <div class="form-section">
+                    <h3 class="section-title">👤 Seleccionar Cliente</h3>
                     <div class="form-group">
-                        <label><i class="fas fa-user"></i> Nombres</label>
-                        <input type="text" name="nombres" required placeholder="Ingrese los nombres">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label><i class="fas fa-user"></i> Apellidos</label>
-                        <input type="text" name="apellidos" required placeholder="Ingrese los apellidos">
+                        <label for="clienteSearch" class="form-label">Buscar Cliente</label>
+                        <div class="search-container">
+                            <input type="text" id="clienteSearch" class="form-input" placeholder="Nombre o DNI del cliente">
+                            <i class="fas fa-search" id="search-icon"></i>
+                        </div>
+                        <ul id="clienteList">
+                            <li data-id="0">
+                                <input type="radio" name="idCliente" value="0" id="cliente-0" class="cliente-radio" style="display:none;" required>
+                                <label for="cliente-0">
+                                    <span class="cliente-nombre">Cliente Indocumentado</span>
+                                    <span class="cliente-doc">(-----)</span>
+                                </label>
+                            </li>
+                            <?php while($cli = mysqli_fetch_assoc($resultClientes)): ?>
+                                <li data-id="<?php echo $cli['idCliente']; ?>">
+                                    <input type="radio" name="idCliente" value="<?php echo $cli['idCliente']; ?>" id="cliente-<?php echo $cli['idCliente']; ?>" class="cliente-radio" style="display:none;">
+                                    <label for="cliente-<?php echo $cli['idCliente']; ?>">
+                                        <span class="cliente-nombre"><?php echo htmlspecialchars($cli['nombres'].' '.$cli['apellidos']); ?></span>
+                                        <span class="cliente-doc">(<?php echo htmlspecialchars($cli['tipoDocumento'].' '.$cli['numeroDocumento']); ?>)</span>
+                                    </label>
+                                </li>
+                            <?php endwhile; ?>
+                        </ul>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                        <select name="tipoDocumento" required>
-                            <option value="">Seleccionar tipo</option>
-                            <option value="DNI">DNI</option>
-                            <option value="CE">Carnet de Extranjería</option>
-                        </select>
+                <div class="form-section">
+                    <h3 class="section-title">📦 Seleccionar Productos</h3>
+                    <div class="products-list" id="productsList">
+                        <?php while($prod = mysqli_fetch_assoc($resultProductos)): ?>
+                            <div class="product-item" data-id="<?php echo $prod['idProducto']; ?>">
+                                <input type="checkbox"
+                                       class="product-checkbox"
+                                       data-nombre="<?php echo htmlspecialchars($prod['nombreProducto']); ?>"
+                                       data-precio="<?php echo $prod['precio']; ?>"
+                                       value="<?php echo $prod['idProducto']; ?>">
+                                <div class="product-details">
+                                    <div class="product-name"><?php echo htmlspecialchars($prod['nombreProducto']); ?></div>
+                                    <div class="product-price">S/. <?php echo number_format($prod['precio'], 2); ?></div>
+                                </div>
+                                <input type="number"
+                                       name="productos[<?php echo $prod['idProducto']; ?>][cantidad]"
+                                       class="product-quantity"
+                                       min="1"
+                                       value="1"
+                                       disabled>
+                                <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][precioUnitario]" value="<?php echo $prod['precio']; ?>">
+                                <input type="hidden" name="productos[<?php echo $prod['idProducto']; ?>][nombre]" value="<?php echo htmlspecialchars($prod['nombreProducto']); ?>">
+                            </div>
+                        <?php endwhile; ?>
                     </div>
-                    
-                    <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                        <input type="text" name="numeroDocumento" required placeholder="Ingrese el número">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-map-marker-alt"></i> Dirección</label>
-                    <input type="text" name="direccion" required placeholder="Ingrese la dirección">
                 </div>
 
-                <div class="form-group">
-                    <label><i class="fas fa-phone"></i> Teléfono</label>
-                    <input type="text" name="telefono" required placeholder="Ingrese el número de teléfono">
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
-                        <input type="text" name="usuario" required placeholder="ejemplo@correo.com">
+                <div class="summary-panel" id="summaryPanel">
+                    <div class="section-title">📊 Resumen de la Venta</div>
+                    <ul class="summary-list" id="summaryItems"></ul>
+                    <div class="summary-item total-row">
+                        <span>Total a Pagar:</span>
+                        <span id="totalAmount">S/. 0.00</span>
                     </div>
-                    
-                    <div class="form-group">
-                        <label><i class="fas fa-lock"></i> Contraseña</label>
-                        <input type="password" name="contrasena" required placeholder="Ingrese una contraseña segura">
+                    <div class="payment-panel">
+                        <h4>💰 Pago</h4>
+                        <div class="form-group payment-info">
+                            <label for="montoPagado" class="form-label">Monto Pagado</label>
+                            <input type="number" step="0.01" min="0" class="form-input" id="montoPagado" required placeholder="0.00">
+                        </div>
+                        <div class="form-group payment-info">
+                            <span class="form-label">Cambio:</span>
+                            <span id="cambioAmount">S/. 0.00</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-user-tag"></i> Rol</label>
-                    <select name="idRol" required>
-                        <option value="">Seleccionar rol</option>
-                        <?php foreach($roles as $rol): ?>
-                            <option value="<?php echo $rol['idRol']; ?>"><?php echo $rol['nombreRol']; ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
-                    <i class="fas fa-plus"></i> Crear Usuario
+
+                <input type="hidden" name="monto_pagado" id="montoPagadoHidden">
+                <input type="hidden" name="cambio_hidden" id="cambioHidden">
+
+                <button type="submit" class="btn-submit" id="submitBtn" disabled>
+                    💾 Generar Boleta
                 </button>
             </form>
         </div>
     </div>
 
-    <div class="modal" id="modalEditar">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Editar Usuario</h3>
-                <button class="close" onclick="cerrarModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <form method="POST" onsubmit="showLoadingModal(this)">
-                <input type="hidden" name="editar" value="1">
-                <input type="hidden" name="idUsuario" id="edit_idUsuario">
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-user"></i> Nombres</label>
-                        <input type="text" name="nombres" id="edit_nombres" required placeholder="Ingrese los nombres">
-                    </div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const formBoleta = document.getElementById('formBoleta');
+            const clienteSearchInput = document.getElementById('clienteSearch');
+            const clienteList = document.getElementById('clienteList');
+            const productsList = document.getElementById('productsList');
+            const summaryPanel = document.getElementById('summaryPanel');
+            const summaryItems = document.getElementById('summaryItems');
+            const totalAmountSpan = document.getElementById('totalAmount');
+            const montoPagadoInput = document.getElementById('montoPagado');
+            const cambioAmountSpan = document.getElementById('cambioAmount');
+            const submitBtn = document.getElementById('submitBtn');
+            const toast = document.getElementById('toast');
+
+            let total = 0;
+            const clienteRadios = document.querySelectorAll('.cliente-radio');
+
+            function updateTotal() {
+                total = 0;
+                let itemsHtml = '';
+                const selectedProducts = productsList.querySelectorAll('.product-item.selected');
+
+                if (selectedProducts.length === 0) {
+                    summaryPanel.style.display = 'none';
+                    return;
+                }
+
+                selectedProducts.forEach(item => {
+                    const checkbox = item.querySelector('.product-checkbox');
+                    const quantityInput = item.querySelector('.product-quantity');
+                    const productName = checkbox.dataset.nombre;
+                    const productPrice = parseFloat(checkbox.dataset.precio);
+                    const quantity = parseInt(quantityInput.value) || 0;
+                    const subtotal = productPrice * quantity;
                     
-                    <div class="form-group">
-                        <label><i class="fas fa-user"></i> Apellidos</label>
-                        <input type="text" name="apellidos" id="edit_apellidos" required placeholder="Ingrese los apellidos">
-                    </div>
-                </div>
+                    if (quantity > 0) {
+                        total += subtotal;
+                        itemsHtml += `<li class="summary-item">
+                                            <span>${productName} (${quantity}x)</span>
+                                            <span>S/. ${subtotal.toFixed(2)}</span>
+                                        </li>`;
+                    }
+                });
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-id-card"></i> Tipo de Documento</label>
-                        <select name="tipoDocumento" id="edit_tipoDocumento" required>
-                            <option value="">Seleccionar tipo</option>
-                            <option value="DNI">DNI</option>
-                            <option value="CE">Carnet de Extranjería</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Número de Documento</label>
-                        <input type="text" name="numeroDocumento" id="edit_numeroDocumento" required placeholder="Ingrese el número">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-map-marker-alt"></i> Dirección</label>
-                    <input type="text" name="direccion" id="edit_direccion" required placeholder="Ingrese la dirección">
-                </div>
+                summaryItems.innerHTML = itemsHtml;
+                totalAmountSpan.textContent = `S/. ${total.toFixed(2)}`;
+                summaryPanel.style.display = 'block';
 
-                <div class="form-group">
-                    <label><i class="fas fa-phone"></i> Teléfono</label>
-                    <input type="text" name="telefono" id="edit_telefono" required placeholder="Ingrese el número de teléfono">
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-envelope"></i> Correo Electrónico</label>
-                        <input type="text" name="usuario" id="edit_usuario" required placeholder="ejemplo@correo.com">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label><i class="fas fa-lock"></i> Contraseña</label>
-                        <input type="password" name="contrasena" id="edit_contrasena" required placeholder="Ingrese una contraseña segura">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label><i class="fas fa-user-tag"></i> Rol</label>
-                    <select name="idRol" id="edit_idRol" required>
-                        <option value="">Seleccionar rol</option>
-                        <?php foreach($roles as $rol): ?>
-                            <option value="<?php echo $rol['idRol']; ?>"><?php echo $rol['nombreRol']; ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
-                    <i class="fas fa-save"></i> Actualizar Usuario
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <div class="toast-container" id="toastContainer"></div>
-
-    <?php include(__DIR__ . "/includes/footer.php"); ?>
-</div>
-
-<script>
-// Variables globales para modales
-let currentModal = null;
-
-// Función para mostrar toast notifications
-function showToast(message, type = 'success', duration = 5000) {
-    const toastContainer = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    
-    const icons = {
-        success: 'fas fa-check',
-        error: 'fas fa-times',
-        warning: 'fas fa-exclamation-triangle',
-        info: 'fas fa-info'
-    };
-    
-    const titles = {
-        success: 'Éxito',
-        error: 'Error',
-        warning: 'Advertencia',
-        info: 'Información'
-    };
-    
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <div class="toast-icon">
-            <i class="${icons[type]}"></i>
-        </div>
-        <div class="toast-content">
-            <div class="toast-title">${titles[type]}</div>
-            <div class="toast-message">${message}</div>
-        </div>
-        <button class="toast-close" onclick="hideToast(this)">
-            <i class="fas fa-times"></i>
-        </button>
-        <div class="toast-progress"></div>
-    `;
-    
-    toastContainer.appendChild(toast);
-    
-    // Auto hide after duration
-    setTimeout(() => {
-        hideToast(toast.querySelector('.toast-close'));
-    }, duration);
-}
-
-function hideToast(button) {
-    const toast = button.closest('.toast');
-    toast.classList.add('hiding');
-    setTimeout(() => {
-        toast.remove();
-    }, 300);
-}
-
-// Funciones para modales
-function abrirModal(tipo) {
-    if (tipo === 'nuevo') {
-        currentModal = document.getElementById('modalNuevo');
-        currentModal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-
-        // Enfocar el primer campo
-        setTimeout(() => {
-            const firstInput = currentModal.querySelector('input[name="nombres"]');
-            if (firstInput) {
-                firstInput.focus();
+                updatePaymentDetails();
             }
-        }, 200);
-    }
-}
 
-function abrirModalEditar(userData) {
-    currentModal = document.getElementById('modalEditar');
-    
-    // Llenar los campos del modal con los datos del usuario
-    document.getElementById('edit_idUsuario').value = userData.idUsuario;
-    document.getElementById('edit_nombres').value = userData.nombres;
-    document.getElementById('edit_apellidos').value = userData.apellidos;
-    document.getElementById('edit_tipoDocumento').value = userData.tipoDocumento;
-    document.getElementById('edit_numeroDocumento').value = userData.numeroDocumento;
-    document.getElementById('edit_direccion').value = userData.direccion;
-    document.getElementById('edit_telefono').value = userData.telefono;
-    document.getElementById('edit_usuario').value = userData.usuario;
-    document.getElementById('edit_contrasena').value = userData.contrasena;
-    document.getElementById('edit_idRol').value = userData.idRol;
-    
-    currentModal.classList.add('show');
-    document.body.style.overflow = 'hidden';
+            function updatePaymentDetails() {
+                const montoPagado = parseFloat(montoPagadoInput.value) || 0;
+                let cambio = montoPagado - total;
+                const clienteSeleccionado = document.querySelector('input[name="idCliente"]:checked');
 
-    // Enfocar el primer campo
-    setTimeout(() => {
-        const firstInput = currentModal.querySelector('input[name="nombres"]');
-        if (firstInput) {
-            firstInput.focus();
-        }
-    }, 200);
-}
-
-function cerrarModal() {
-    if (currentModal) {
-        currentModal.classList.remove('show');
-        document.body.style.overflow = 'auto';
-        
-        // Reset form
-        const form = currentModal.querySelector('form');
-        if (form) {
-            form.reset();
-        }
-        
-        currentModal = null;
-    }
-}
-
-// Cerrar modal al hacer clic fuera
-window.onclick = function(event) {
-    const modalNuevo = document.getElementById('modalNuevo');
-    const modalEditar = document.getElementById('modalEditar');
-    
-    if (event.target === modalNuevo) {
-        cerrarModal();
-    } else if (event.target === modalEditar) {
-        cerrarModal();
-    }
-}
-
-// Cerrar modal con Escape
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        cerrarModal();
-    }
-});
-
-// Función para mostrar loading en botones
-function showLoadingModal(form) {
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    
-    if (originalText.includes('Crear')) {
-        submitBtn.innerHTML = '<span class="loading"></span> Creando...';
-    } else {
-        submitBtn.innerHTML = '<span class="loading"></span> Actualizando...';
-    }
-    
-    submitBtn.disabled = true;
-}
-
-// Mostrar toast si hay mensaje en sesión
-<?php if (isset($_SESSION['toast_message'])): ?>
-showToast('<?php echo addslashes($_SESSION['toast_message']); ?>', '<?php echo $_SESSION['toast_type']; ?>');
-<?php 
-unset($_SESSION['toast_message']);
-unset($_SESSION['toast_type']);
-endif; ?>
-
-// Validación mejorada para formularios
-document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function(e) {
-        const requiredFields = form.querySelectorAll('[required]');
-        let isValid = true;
-        
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                field.style.borderColor = 'var(--error-color)';
-                field.style.boxShadow = '0 0 0 3px rgba(245, 101, 101, 0.1)';
-                isValid = false;
-            } else {
-                field.style.borderColor = 'var(--border-color)';
-                field.style.boxShadow = 'none';
+                if (montoPagado >= total && total > 0 && clienteSeleccionado) {
+                    cambioAmountSpan.textContent = `S/. ${cambio.toFixed(2)}`;
+                    submitBtn.disabled = false;
+                } else {
+                    cambioAmountSpan.textContent = `S/. 0.00`;
+                    submitBtn.disabled = true;
+                }
             }
-        });
-        
-        if (!isValid) {
-            e.preventDefault();
-            showToast('Por favor complete todos los campos requeridos', 'error');
-        }
-    });
-});
 
-// FILTRADO DINÁMICO DE LA TABLA
-const searchInput = document.getElementById('searchInput');
-searchInput.addEventListener('keyup', function(event) {
-    const filter = event.target.value.toLowerCase();
-    const rows = document.getElementById('userTableBody').getElementsByTagName('tr');
-
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const cells = row.getElementsByTagName('td');
-        let found = false;
-        
-        // Buscar en todas las celdas excepto la de acciones (última columna)
-        for (let j = 0; j < cells.length - 1; j++) {
-            const cellText = cells[j].textContent || cells[j].innerText;
-            if (cellText.toLowerCase().indexOf(filter) > -1) {
-                found = true;
-                break;
+            function showToast(message, type) {
+                toast.textContent = message;
+                toast.className = `toast show ${type}`;
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
             }
-        }
-        
-        if (found) {
-            row.style.display = "";
-        } else {
-            row.style.display = "none";
-        }
-    }
-});
 
-// Smooth scroll para elementos
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
+            // Filtro de clientes
+            clienteSearchInput.addEventListener('input', function() {
+                const filter = this.value.toLowerCase();
+                const items = clienteList.querySelectorAll('li');
+                items.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    item.style.display = text.includes(filter) ? '' : 'none';
+                });
             });
-        }
-    });
-});
 
-// Mejorar la experiencia táctil en dispositivos móviles
-if ('ontouchstart' in window) {
-    document.body.classList.add('touch-device');
-    
-    // Agregar efecto de hover para dispositivos táctiles
-    document.querySelectorAll('.btn').forEach(btn => {
-        btn.addEventListener('touchstart', function() {
-            this.style.transform = 'translateY(-1px)';
-        });
-        
-        btn.addEventListener('touchend', function() {
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 150);
-        });
-    });
-}
+            // Selección de cliente
+            clienteList.addEventListener('click', function(e) {
+                const listItem = e.target.closest('li');
+                if (listItem) {
+                    const radio = listItem.querySelector('input[type="radio"]');
+                    if (radio) {
+                        radio.checked = true;
+                        updatePaymentDetails();
+                    }
+                }
+            });
 
-// Optimización para scroll horizontal en tablas móviles
-const tableWrapper = document.querySelector('.table-wrapper');
-if (tableWrapper) {
-    let isScrolling = false;
-    
-    tableWrapper.addEventListener('scroll', function() {
-        if (!isScrolling) {
-            isScrolling = true;
-            this.style.scrollBehavior = 'smooth';
+            // Event Listeners
+            productsList.addEventListener('change', (event) => {
+                const target = event.target;
+                if (target.classList.contains('product-checkbox')) {
+                    const item = target.closest('.product-item');
+                    const quantityInput = item.querySelector('.product-quantity');
+                    
+                    item.classList.toggle('selected', target.checked);
+                    quantityInput.disabled = !target.checked;
+                    if (!target.checked) {
+                        quantityInput.value = 1;
+                    }
+
+                    updateTotal();
+                }
+            });
+
+            productsList.addEventListener('input', (event) => {
+                if (event.target.classList.contains('product-quantity')) {
+                    updateTotal();
+                }
+            });
             
-            setTimeout(() => {
-                isScrolling = false;
-            }, 150);
-        }
-    });
-}
+            montoPagadoInput.addEventListener('input', updatePaymentDetails);
+            clienteRadios.forEach(radio => radio.addEventListener('change', updatePaymentDetails));
 
-// Validación adicional para campos específicos
-document.addEventListener('DOMContentLoaded', function() {
-    // Validación de email
-    const emailInputs = document.querySelectorAll('input[name="usuario"]');
-    emailInputs.forEach(input => {
-        input.addEventListener('blur', function() {
-            const email = this.value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            formBoleta.addEventListener('submit', function(e) {
+                const selectedProductsCount = productsList.querySelectorAll('.product-item.selected').length;
+                const clienteSeleccionado = document.querySelector('input[name="idCliente"]:checked');
+
+                if (selectedProductsCount === 0) {
+                    e.preventDefault();
+                    showToast('Por favor, selecciona al menos un producto.', 'warning');
+                    return;
+                }
+                
+                if (!clienteSeleccionado) {
+                    e.preventDefault();
+                    showToast('Por favor, selecciona un cliente.', 'warning');
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Procesando...';
+
+                document.getElementById('montoPagadoHidden').value = montoPagadoInput.value;
+                document.getElementById('cambioHidden').value = parseFloat(cambioAmountSpan.textContent.replace('S/. ', '')) || 0;
+            });
             
-            if (email && !emailRegex.test(email)) {
-                this.style.borderColor = 'var(--warning-color)';
-                showToast('Por favor ingrese un formato de email válido', 'warning', 3000);
-            } else {
-                this.style.borderColor = 'var(--border-color)';
-                this.style.boxShadow = 'none';
+            updateTotal();
+
+            const sessionMessage = '<?php echo $mensaje; ?>';
+            const sessionType = '<?php echo $tipoMensaje; ?>';
+            if (sessionMessage) {
+                showToast(sessionMessage, sessionType);
             }
         });
-    });
-    
-    // Validación de documento
-    const docInputs = document.querySelectorAll('input[name="numeroDocumento"]');
-    docInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            // Solo permitir números
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    });
-    
-    // Validación de teléfono
-    const phoneInputs = document.querySelectorAll('input[name="telefono"]');
-    phoneInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            // Solo permitir números y algunos caracteres especiales
-            this.value = this.value.replace(/[^0-9+\-\s()]/g, '');
-        });
-    });
-});
-</script>
+    </script>
 </body>
 </html>
