@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $total = 0;
     $detalleProductos = [];
 
-    // **NUEVAS VARIABLES para capturar los datos del cliente del formulario**
+    // Capturar datos del cliente enviados por el formulario
     $clienteNombre = isset($_POST['cliente_nombre']) ? htmlspecialchars($_POST['cliente_nombre']) : 'Cliente Genérico';
     $clienteTipoDoc = isset($_POST['cliente_tipodoc']) ? htmlspecialchars($_POST['cliente_tipodoc']) : 'DNI';
     $clienteNumeroDoc = isset($_POST['cliente_numerodoc']) ? htmlspecialchars($_POST['cliente_numerodoc']) : '-----';
@@ -136,8 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdf->Cell($anchoEfectivo, 4, 'Fecha: ' . $fechaEmision, 0, 1, 'C');
         $pdf->Ln(5);
 
-        // Info cliente (LÓGICA CORREGIDA AQUÍ)
-        // Solo buscamos en la base de datos si NO es el cliente genérico (id != 0)
+        // LÓGICA CORREGIDA AQUÍ
         if ($idCliente != 0) {
             $sqlCliente = "SELECT p.* FROM cliente c JOIN persona p ON c.idPersona=p.idPersona WHERE c.idCliente=?";
             $stmtCliente = mysqli_prepare($conn, $sqlCliente);
@@ -149,7 +148,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $clienteNombre = $cliente['nombres'] . ' ' . $cliente['apellidos'];
             $clienteTipoDoc = htmlspecialchars($cliente['tipoDocumento'] ?? 'DNI');
-            $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '-----');
+            $clienteNumeroDoc = htmlspecialchars($cliente['numeroDocumento'] ?? '');
+            
+            // Si el DNI está vacío en la base de datos, lo mostramos como -----
+            if (empty($clienteNumeroDoc)) {
+                $clienteNumeroDoc = '-----';
+            }
+        } else {
+            // Este es el cliente genérico. Usamos las variables del formulario.
+            // Y validamos si el número de documento está vacío, lo que debería pasar.
             if (empty($clienteNumeroDoc)) {
                 $clienteNumeroDoc = '-----';
             }
@@ -625,7 +632,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="clienteSearch" class="form-label">Buscar Cliente</label>
                         <input type="text" id="clienteSearch" class="form-input dropdown-input" placeholder="Nombre o DNI del cliente" readonly>
                         <ul id="clienteList" class="dropdown-list">
-                            <li class="dropdown-item" data-id="0" data-nombre="Cliente Genérico" data-tipodoc="DNI" data-numerodoc="-----">
+                            <li class="dropdown-item" data-id="0" data-nombre="Cliente Genérico" data-tipodoc="DNI" data-numerodoc="">
                                 <label>
                                     <span class="cliente-nombre">Cliente Genérico</span>
                                     <span class="cliente-doc">(DNI: -----)</span>
@@ -760,9 +767,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     clienteTipoDocHidden.value = tipoDoc;
                     clienteNumeroDocHidden.value = numeroDoc;
 
-                    // Para el input visible, ajustamos el formato si es el cliente genérico
+                    // Para el input visible, ajustamos el formato
                     if (id === "0") {
-                        clienteSearchInput.value = `${nombre} (${tipoDoc}: ${numeroDoc})`;
+                        clienteSearchInput.value = `${nombre} (${tipoDoc}: -----)`;
                     } else {
                         clienteSearchInput.value = `${nombre} (${numeroDoc})`;
                     }
