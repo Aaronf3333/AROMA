@@ -799,7 +799,9 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
                                     <td>
                                         <div class="user-info">
                                             <div class="user-name"><?php echo htmlspecialchars($row['tipoDocumento']); ?></div>
-                                            <div class="user-detail"><?php echo htmlspecialchars($row['numeroDocumento']); ?></div>
+                                            <div class="user-detail">
+                                                <?php echo htmlspecialchars(!empty($row['numeroDocumento']) ? $row['numeroDocumento'] : '-----'); ?>
+                                            </div>
                                         </div>
                                     </td>
                                     <td><?php echo htmlspecialchars($row['direccion']); ?></td>
@@ -827,7 +829,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         </div>
     </div>
 
-    <!-- Modal Nuevo Usuario -->
     <div class="modal" id="modalNuevo">
         <div class="modal-content">
             <div class="modal-header">
@@ -906,7 +907,6 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
         </div>
     </div>
 
-    <!-- Modal Editar Usuario -->
     <div class="modal" id="modalEditar">
         <div class="modal-content">
             <div class="modal-header">
@@ -1260,6 +1260,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showToast('Por favor ingrese un formato de email válido', 'warning', 3000);
             } else {
                 this.style.borderColor = 'var(--border-color)';
+                this.style.boxShadow = 'none';
             }
         });
     });
